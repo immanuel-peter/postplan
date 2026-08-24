@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+
+.cursor/
+.agents/
+CONTEXT.md
+docs/adr/

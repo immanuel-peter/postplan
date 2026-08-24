@@ -1,0 +1,96 @@
+version: "1.0"
+name: postplan
+description: "My personal Postplan"
+
+services:
+  database:
+    type: postgres
+    resources:
+      preset: medium
+      storage: 20Gi
+    backups:
+      schedule: daily
+      retention: 14
+      pitr: true
+
+  garage:
+    type: custom
+    image: dxflrs/garage:v2.3.0
+    visibility: private
+    resources: small
+    entrypoint: ["/garage"]
+    command: ["server", "--single-node", "--default-bucket"]
+    ports:
+      - 3900
+      - 3903
+    files:
+      - name: garage-config
+        mount: /etc/garage.toml
+        source: ./garage.toml
+    env:
+      GARAGE_CONFIG_FILE: /etc/garage.toml
+      GARAGE_RPC_SECRET: ${secret:GARAGE_RPC_SECRET}
+      GARAGE_ADMIN_TOKEN: ${secret:GARAGE_ADMIN_TOKEN}
+      GARAGE_METRICS_TOKEN: ${secret:GARAGE_METRICS_TOKEN}
+      GARAGE_DEFAULT_BUCKET: postplan
+      GARAGE_DEFAULT_ACCESS_KEY: ${secret:GARAGE_ACCESS_KEY}
+      GARAGE_DEFAULT_SECRET_KEY: ${secret:GARAGE_SECRET_KEY}
+    persistence:
+      - name: garage-meta
+        mount: /var/lib/garage/meta
+        size: 5Gi
+      - name: garage-data
+        mount: /var/lib/garage/data
+        size: 20Gi
+    backups:
+      schedule: daily
+      retention: 7
+      command: ["sh", "-c", "tar -czf /backup/garage-$(date +%Y%m%d-%H%M%S).tar.gz -C / var/lib/garage"]
+      restore_command: ["sh", "-c", "tar -xzf /backup/garage-*.tar.gz -C /"]
+    health:
+      command: /garage status
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    type: custom
+    build:
+      source: .
+      dockerfile: Dockerfile
+    visibility: private
+    ports:
+      - 3000
+    depends_on:
+      - database
+      - garage
+    env:
+      NODE_ENV: production
+      PORT: "3000"
+      BASE_DOMAIN: postplan.link
+      DATABASE_URL: ${database.url}
+      S3_ENDPOINT_URL: ${garage.port_1.url}
+      S3_REGION: garage
+      S3_BUCKET: postplan
+      S3_ACCESS_KEY_ID: ${secret:GARAGE_ACCESS_KEY}
+      S3_SECRET_ACCESS_KEY: ${secret:GARAGE_SECRET_KEY}
+      S3_ADDRESSING_STYLE: path
+      TOKEN_PEPPER: ${secret:TOKEN_PEPPER}
+      BOOTSTRAP_TOKEN: ${secret:BOOTSTRAP_TOKEN}
+    health:
+      http: /healthz
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    lifecycle:
+      migrate:
+        command: ["npm", "run", "db:migrate"]
+        timeout: 5m
+
+  cloudflared:
+    type: custom
+    image: cloudflare/cloudflared:2026.8.2
+    visibility: private
+    command: ["tunnel", "run"]
+    env:
+      TUNNEL_TOKEN: ${secret:CLOUDFLARE_TUNNEL_TOKEN}

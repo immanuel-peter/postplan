@@ -1,0 +1,34 @@
+<% layout("../layouts/main") %>
+<h1>My drafts</h1>
+<% if (it.groups.length === 0) { %>
+  <p class="lede">No drafts yet. Publish one with curl and a Token.</p>
+<% } %>
+<% for (const group of it.groups) { %>
+  <section class="group">
+    <div class="group-head">
+      <h2><%= group.heading %></h2>
+      <% if (group.repositoryUrl) { %>
+        <a class="github" href="<%= group.repositoryUrl %>" target="_blank" rel="noreferrer">GitHub ↗</a>
+      <% } %>
+    </div>
+    <% for (const draft of group.drafts) { %>
+      <article class="draft-row">
+        <div class="draft-topline">
+          <a class="draft-title" href="<%= draft.versionUrl %>" target="_blank" rel="noreferrer"><%= draft.title %></a>
+          <p class="draft-meta">
+            <a href="/drafts/<%= draft.id %>">Details</a>
+            <span class="dot">·</span>
+            <span><%= draft.versionLabel %></span>
+            <span class="dot">·</span>
+            <span><%= draft.versionsLabel %></span>
+            <span class="dot">·</span>
+            <time><%= draft.updatedLabel %></time>
+          </p>
+        </div>
+        <% if (draft.description) { %>
+          <p class="draft-desc"><%= draft.description %></p>
+        <% } %>
+      </article>
+    <% } %>
+  </section>
+<% } %>

@@ -1,0 +1,64 @@
+<% layout("../layouts/main") %>
+<h1>API keys</h1>
+<p class="lede">Generate a Token, then send it as <code>Authorization: Bearer</code> in curl.</p>
+<% if (it.error) { %>
+  <p class="form-error"><%= it.error %></p>
+<% } %>
+<form class="generate-form" method="post" action="/keys">
+  <label for="name">Name</label>
+  <input id="name" name="name" type="text" placeholder="API · UTC stamp" autocomplete="off" />
+  <button class="btn-primary" type="submit">Generate a new API key</button>
+</form>
+<p class="note">Each visit can mint a fresh key. Keys are shown once.</p>
+<% if (it.secret) { %>
+  <div class="secret-panel">
+    <p>Copy this Token now. It will not be shown again.</p>
+    <pre><code id="new-secret"><%= it.secret %></code></pre>
+    <button class="btn-copy" type="button" id="copy-secret">Copy</button>
+  </div>
+  <script>
+    (function () {
+      var button = document.getElementById("copy-secret");
+      var code = document.getElementById("new-secret");
+      if (!button || !code) return;
+      button.addEventListener("click", function () {
+        var text = code.textContent || "";
+        navigator.clipboard.writeText(text).then(function () {
+          button.textContent = "Copied";
+          setTimeout(function () { button.textContent = "Copy"; }, 1500);
+        });
+      });
+    })();
+  </script>
+<% } %>
+<h2 class="section-title">Active keys</h2>
+<table class="plain keys-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Created</th>
+      <th>Last used</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (it.tokens.length === 0) { %>
+      <tr><td class="muted" colspan="4">No active keys.</td></tr>
+    <% } %>
+    <% for (const token of it.tokens) { %>
+      <tr>
+        <td>
+          <div><%= token.name %></div>
+          <div class="prefix"><%= token.prefix %></div>
+        </td>
+        <td class="muted"><%= token.createdLabel %></td>
+        <td class="muted"><%= token.lastUsedLabel %></td>
+        <td class="revoke-cell">
+          <form method="post" action="/keys/<%= token.id %>/revoke">
+            <button class="link-button" type="submit">Revoke</button>
+          </form>
+        </td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>

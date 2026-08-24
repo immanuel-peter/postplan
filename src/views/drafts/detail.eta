@@ -1,0 +1,43 @@
+<% layout("../layouts/main") %>
+<a class="back" href="/">← My drafts</a>
+<h1><%= it.draft.title %></h1>
+<% if (it.draft.description) { %>
+  <p class="lede"><%= it.draft.description %></p>
+<% } %>
+<p class="public-url-row">
+  <a class="public-url" href="<%= it.draft.publicUrl %>" target="_blank" rel="noreferrer"><%= it.draft.publicUrl %></a>
+</p>
+<table class="plain">
+  <thead>
+    <tr>
+      <th>Version</th>
+      <th>Commit</th>
+      <th>Ref</th>
+      <th>Published</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% for (const version of it.versions) { %>
+      <tr>
+        <td>
+          <a href="<%= version.versionUrl %>" target="_blank" rel="noreferrer"><%= version.versionLabel %></a>
+        </td>
+        <td class="mono">
+          <%= version.commitLabel %><% if (version.dirty) { %> <span class="chip-dirty">dirty</span><% } %>
+        </td>
+        <td class="muted mono"><%= version.refLabel %></td>
+        <td class="muted mono"><%= version.publishedLabel %></td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>
+<form class="edit-form" method="post" action="/drafts/<%= it.draft.id %>">
+  <label for="title">Title</label>
+  <input id="title" name="title" type="text" value="<%= it.draft.titleValue %>" />
+  <label for="description">Description</label>
+  <textarea id="description" name="description" rows="3"><%= it.draft.description %></textarea>
+  <button class="btn-primary btn-compact" type="submit">Save</button>
+</form>
+<form class="delete-form" method="post" action="/drafts/<%= it.draft.id %>/delete" onsubmit="return confirm('Delete draft')">
+  <button class="link-button" type="submit">Delete draft</button>
+</form>

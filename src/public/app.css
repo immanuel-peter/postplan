@@ -1,0 +1,380 @@
+:root {
+  color-scheme: light only;
+  --bg: #f6f5f2;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --link: #0b57d0;
+  --line: #e4e2dc;
+  --input-border: #d4d1c9;
+  --chip-bg: #fff1e0;
+  --chip-text: #9a4b12;
+  --btn: #111;
+  --surface: #fff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", "Source Sans 3", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 8px 32px 96px;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1 {
+  margin: 0 0 0.35rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  align-items: baseline;
+  gap: 1.35rem;
+  padding: 28px 0 18px;
+  margin-bottom: 2.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.nav a {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.nav a.active {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.lede {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  max-width: 40rem;
+}
+
+.group {
+  margin-top: 2.25rem;
+}
+
+.group:first-of-type {
+  margin-top: 1.35rem;
+}
+
+.group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.15rem;
+}
+
+.github {
+  font-size: 0.9rem;
+}
+
+.draft-row {
+  padding: 1rem 0 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.draft-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1.5rem;
+}
+
+.draft-title {
+  font-weight: 500;
+}
+
+.draft-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.draft-meta .dot {
+  color: var(--muted);
+}
+
+.draft-desc {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.925rem;
+  line-height: 1.45;
+  max-width: 40rem;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.back {
+  display: inline-block;
+  margin: 0 0 1.15rem;
+  font-size: 0.925rem;
+}
+
+.public-url-row {
+  margin: 0.85rem 0 1.75rem;
+}
+
+.public-url {
+  text-decoration: underline;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.925rem;
+  word-break: break-all;
+}
+
+table.plain {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.plain th,
+table.plain td {
+  text-align: left;
+  padding: 0.85rem 1rem 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+table.plain th {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 0.35rem;
+  padding-bottom: 0.55rem;
+}
+
+.mono,
+code,
+pre,
+.prefix {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.chip-dirty {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+
+.edit-form,
+.generate-form {
+  margin-top: 2.5rem;
+}
+
+.edit-form label,
+.generate-form label,
+.generate-form legend {
+  display: block;
+  margin: 0.9rem 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.edit-form input,
+.edit-form textarea,
+.generate-form input[type="text"] {
+  width: 100%;
+  max-width: 36rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.edit-form textarea {
+  display: block;
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.edit-form input:focus,
+.edit-form textarea:focus,
+.generate-form input[type="text"]:focus {
+  outline: 2px solid color-mix(in srgb, var(--link) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.btn-primary {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.9rem 1.25rem;
+  border: 0;
+  border-radius: 12px;
+  background: var(--btn);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.generate-form .btn-primary {
+  margin-top: 0.15rem;
+  padding: 0.55rem 1.4rem;
+  border: 1px solid var(--btn);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.btn-primary:hover {
+  background: #000;
+}
+
+.btn-compact {
+  margin-top: 1rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+}
+
+.note {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.section-title {
+  margin: 2.5rem 0 0.75rem;
+  font-size: 1.15rem;
+}
+
+.keys-table th:last-child,
+.keys-table td:last-child {
+  text-align: right;
+  padding-right: 0;
+}
+
+.prefix {
+  margin-top: 0.15rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.revoke-cell form {
+  margin: 0;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.delete-form {
+  margin-top: 1.75rem;
+}
+
+.secret-panel {
+  margin: 1.75rem 0 0;
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.secret-panel p {
+  margin: 0 0 0.65rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.secret-panel pre {
+  margin: 0 0 0.75rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.secret-panel code {
+  font-size: 0.8125rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.btn-copy {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-copy:hover {
+  border-color: var(--muted);
+}
+
+.form-error {
+  color: #8a2b1a;
+  font-size: 0.9rem;
+}
+
+code {
+  font-size: 0.88em;
+}
