@@ -67,7 +67,7 @@ services:
     env:
       NODE_ENV: production
       PORT: "3000"
-      BASE_DOMAIN: postplan.link
+      BASE_DOMAIN: ${secret:BASE_DOMAIN}
       DATABASE_URL: ${database.url}
       S3_ENDPOINT_URL: ${garage.port_1.url}
       S3_REGION: garage

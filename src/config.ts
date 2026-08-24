@@ -35,7 +35,7 @@ export function loadConfig(): AppConfig {
   return {
     nodeEnv: optional("NODE_ENV", "production"),
     port: Number.parseInt(optional("PORT", "3000"), 10),
-    baseDomain: optional("BASE_DOMAIN", "postplan.link"),
+    baseDomain: optional("BASE_DOMAIN", "postplan.domain"),
     databaseUrl: required("DATABASE_URL"),
     s3EndpointUrl: required("S3_ENDPOINT_URL"),
     s3Region: optional("S3_REGION", "garage"),
