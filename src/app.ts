@@ -135,5 +135,21 @@ export async function buildApp(deps: AppDeps) {
     return reply.type("text/css; charset=utf-8").send(css);
   });
 
+  const faviconSvg = readFileSync(join(here, "public", "favicon.svg"));
+  const faviconIco = readFileSync(join(here, "public", "favicon.ico"));
+  const touchIcon = readFileSync(join(here, "public", "apple-touch-icon.png"));
+  app.get("/static/favicon.svg", async (_request, reply) => {
+    return reply.type("image/svg+xml").send(faviconSvg);
+  });
+  app.get("/static/favicon.ico", async (_request, reply) => {
+    return reply.type("image/x-icon").send(faviconIco);
+  });
+  app.get("/static/apple-touch-icon.png", async (_request, reply) => {
+    return reply.type("image/png").send(touchIcon);
+  });
+  app.get("/favicon.ico", async (_request, reply) => {
+    return reply.type("image/x-icon").send(faviconIco);
+  });
+
   return app;
 }

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
 import {
@@ -125,6 +128,30 @@ async function servePublicHtml(
 export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   const draftHost = draftHostConstraint(deps.config.baseDomain);
   const draftOnly = { constraints: { host: draftHost } };
+
+  const here = dirname(fileURLToPath(import.meta.url));
+  const faviconIco = readFileSync(join(here, "..", "public", "favicon-draft.ico"));
+  const faviconSvg = readFileSync(join(here, "..", "public", "favicon-draft.svg"));
+  const touchIcon = readFileSync(join(here, "..", "public", "apple-touch-icon-draft.png"));
+
+  app.get("/favicon.ico", draftOnly, async (_request, reply) => {
+    return reply
+      .header("Cache-Control", IMMUTABLE_CACHE_CONTROL)
+      .type("image/x-icon")
+      .send(faviconIco);
+  });
+  app.get("/favicon.svg", draftOnly, async (_request, reply) => {
+    return reply
+      .header("Cache-Control", IMMUTABLE_CACHE_CONTROL)
+      .type("image/svg+xml")
+      .send(faviconSvg);
+  });
+  app.get("/apple-touch-icon.png", draftOnly, async (_request, reply) => {
+    return reply
+      .header("Cache-Control", IMMUTABLE_CACHE_CONTROL)
+      .type("image/png")
+      .send(touchIcon);
+  });
 
   app.get("/", draftOnly, async (request, reply) => {
     const slug = draftSlug(request.hostKind);
