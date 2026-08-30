@@ -14,7 +14,7 @@
     <% for (const draft of group.drafts) { %>
       <article class="draft-row">
         <div class="draft-topline">
-          <a class="draft-title" href="<%= draft.versionUrl %>" target="_blank" rel="noreferrer"><%= draft.title %></a>
+          <a class="draft-title" href="<%= draft.publicUrl %>" target="_blank" rel="noreferrer"><%= draft.title %></a>
           <p class="draft-meta">
             <a href="/drafts/<%= draft.id %>">Details</a>
             <span class="dot">·</span>

@@ -20,7 +20,7 @@ type IdParams = {
 type DraftListRow = {
   id: string;
   title: string;
-  versionUrl: string;
+  publicUrl: string;
   description: string;
   versionLabel: string;
   versionsLabel: string;
@@ -117,7 +117,7 @@ function toListRow(draft: DraftRecord, urls: DraftUrls): DraftListRow {
   return {
     id: draft.id,
     title: draftTitle(draft.title),
-    versionUrl: urls.publicUrl(draft.slug, draft.currentVersion),
+    publicUrl: urls.publicUrl(draft.slug),
     description: draft.description?.trim() ?? "",
     versionLabel: `v${String(draft.currentVersion)}`,
     versionsLabel: versionCountLabel(draft.currentVersion),
