@@ -10,12 +10,14 @@ import Fastify from "fastify";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
-import { MAX_HTML_BYTES } from "./lib/html.js";
 import { classifyHost } from "./lib/host.js";
 import { registerApiRoutes } from "./routes/api.js";
+import { registerAssetPublicRoutes } from "./routes/assets-public.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerPublicRoutes } from "./routes/public.js";
+import type { AssetUrls } from "./services/assets.js";
+import { MAX_ASSET_BYTES } from "./services/assets.js";
 import type { DraftUrls } from "./services/drafts.js";
 import type { TokenRecord } from "./services/types.js";
 
@@ -24,6 +26,7 @@ export type AppDeps = {
   db: Database;
   s3: S3Client;
   urls: DraftUrls;
+  assetUrls: AssetUrls;
   migrationVersion: string;
 };
 
@@ -40,7 +43,7 @@ export async function buildApp(deps: AppDeps) {
   const app = Fastify({
     logger: true,
     trustProxy: true,
-    bodyLimit: MAX_HTML_BYTES,
+    bodyLimit: MAX_ASSET_BYTES + 1024 * 1024,
   });
 
   app.decorateRequest("hostKind", null);
@@ -70,8 +73,8 @@ export async function buildApp(deps: AppDeps) {
   await app.register(formbody);
   await app.register(multipart, {
     limits: {
-      fileSize: MAX_HTML_BYTES,
-      files: 1,
+      fileSize: MAX_ASSET_BYTES,
+      files: 10,
       fields: 16,
     },
     throwFileSizeLimit: true,
@@ -124,6 +127,7 @@ export async function buildApp(deps: AppDeps) {
   registerHealthRoutes(app, deps);
   await registerApiRoutes(app, deps);
   await registerPublicRoutes(app, deps);
+  await registerAssetPublicRoutes(app, deps);
   await registerDashboardRoutes(app, deps);
 
   app.get("/openapi.json", async (_request, reply) => {

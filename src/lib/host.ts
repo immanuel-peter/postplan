@@ -1,5 +1,6 @@
 export type HostKind =
   | { kind: "apex" }
+  | { kind: "assets" }
   | { kind: "draft"; slug: string }
   | { kind: "local" }
   | { kind: "reject" };
@@ -31,6 +32,9 @@ export function classifyHost(hostHeader: string | undefined, baseDomain: string)
   if (hostname === base) {
     return { kind: "apex" };
   }
+  if (hostname === `assets.${base}`) {
+    return { kind: "assets" };
+  }
   if (hostname.endsWith(`.${base}`)) {
     const slug = hostname.slice(0, hostname.length - (base.length + 1));
     if (slug.length > 0 && !slug.includes(".")) {
@@ -54,4 +58,14 @@ export function localDraftUrl(slug: string, port: number, version?: number): str
     return `${origin}/`;
   }
   return `${origin}/v/${version}`;
+}
+
+export function publicAssetUrl(baseDomain: string, id: string, ext?: string | undefined): string {
+  const suffix = ext ? `.${ext}` : "";
+  return `https://assets.${baseDomain}/${id}${suffix}`;
+}
+
+export function localAssetUrl(port: number, id: string, ext?: string | undefined): string {
+  const suffix = ext ? `.${ext}` : "";
+  return `http://assets.postplan.localhost:${port}/${id}${suffix}`;
 }

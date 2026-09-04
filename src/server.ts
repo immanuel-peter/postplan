@@ -2,6 +2,7 @@ import { loadConfig } from "./config.js";
 import { createDb } from "./db/client.js";
 import { createS3, ensureBucket } from "./lib/s3.js";
 import { buildApp } from "./app.js";
+import { assetUrls } from "./services/assets.js";
 import { draftUrls } from "./services/drafts.js";
 import { cleanupOrphans } from "./services/orphans.js";
 import { seedBootstrapToken } from "./services/tokens.js";
@@ -22,6 +23,11 @@ async function main() {
     db,
     s3,
     urls: draftUrls({
+      baseDomain: config.baseDomain,
+      port: config.port,
+      nodeEnv: config.nodeEnv,
+    }),
+    assetUrls: assetUrls({
       baseDomain: config.baseDomain,
       port: config.port,
       nodeEnv: config.nodeEnv,

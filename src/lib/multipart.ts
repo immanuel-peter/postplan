@@ -1,4 +1,5 @@
 import type { FastifyRequest } from "fastify";
+import { MAX_ASSET_BYTES } from "../services/assets.js";
 import { MAX_HTML_BYTES } from "./html.js";
 
 export type MultipartFields = {
@@ -55,4 +56,40 @@ export function parseExpectedVersion(input: {
     return null;
   }
   return n;
+}
+
+export type AssetUploadFile = {
+  bytes: Buffer;
+  filename: string | null;
+  mimetype: string;
+};
+
+export async function readAssetUpload(
+  request: FastifyRequest,
+): Promise<{ files: AssetUploadFile[]; fields: Record<string, string> }> {
+  const files: AssetUploadFile[] = [];
+  const fields: Record<string, string> = {};
+
+  const parts = request.parts();
+  for await (const part of parts) {
+    if (part.type === "file") {
+      if (part.fieldname !== "file") {
+        await part.toBuffer();
+        continue;
+      }
+      const bytes = await part.toBuffer();
+      if (bytes.byteLength > MAX_ASSET_BYTES) {
+        throw Object.assign(new Error("asset exceeds 100 MiB"), { statusCode: 413 });
+      }
+      files.push({
+        bytes,
+        filename: part.filename ?? null,
+        mimetype: part.mimetype ?? "application/octet-stream",
+      });
+    } else {
+      fields[part.fieldname] = part.value as string;
+    }
+  }
+
+  return { files, fields };
 }

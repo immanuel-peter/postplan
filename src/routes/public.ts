@@ -24,7 +24,7 @@ type VersionParams = {
 
 function draftHostConstraint(baseDomain: string): RegExp {
   const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^[^./]+\\.${escaped}(?::\\d+)?$`, "i");
+  return new RegExp(`^(?!assets\\.)[^./]+\\.${escaped}(?::\\d+)?$`, "i");
 }
 
 function draftSlug(hostKind: FastifyRequest["hostKind"]): string | null {
@@ -32,6 +32,7 @@ function draftSlug(hostKind: FastifyRequest["hostKind"]): string | null {
     case "draft":
       return hostKind.slug;
     case "apex":
+    case "assets":
     case "local":
     case "reject":
       return null;

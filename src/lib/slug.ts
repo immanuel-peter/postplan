@@ -11,3 +11,9 @@ export function generateSlug(): string {
   }
   return out;
 }
+
+export const RESERVED_SLUGS = new Set(["assets"]);
+
+export function isReservedSlug(slug: string): boolean {
+  return RESERVED_SLUGS.has(slug.toLowerCase());
+}
