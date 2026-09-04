@@ -11,13 +11,13 @@ import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
 import { classifyHost } from "./lib/host.js";
+import { MAX_HTML_BYTES } from "./lib/html.js";
 import { registerApiRoutes } from "./routes/api.js";
 import { registerAssetPublicRoutes } from "./routes/assets-public.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerPublicRoutes } from "./routes/public.js";
-import type { AssetUrls } from "./services/assets.js";
-import { MAX_ASSET_BYTES } from "./services/assets.js";
+import { MAX_ASSET_BYTES, type AssetUrls } from "./services/assets.js";
 import type { DraftUrls } from "./services/drafts.js";
 import type { TokenRecord } from "./services/types.js";
 
@@ -43,7 +43,7 @@ export async function buildApp(deps: AppDeps) {
   const app = Fastify({
     logger: true,
     trustProxy: true,
-    bodyLimit: MAX_ASSET_BYTES + 1024 * 1024,
+    bodyLimit: MAX_HTML_BYTES + 1024 * 1024,
   });
 
   app.decorateRequest("hostKind", null);
@@ -74,7 +74,7 @@ export async function buildApp(deps: AppDeps) {
   await app.register(multipart, {
     limits: {
       fileSize: MAX_ASSET_BYTES,
-      files: 10,
+      files: 1,
       fields: 16,
     },
     throwFileSizeLimit: true,

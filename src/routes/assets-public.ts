@@ -1,7 +1,7 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AppDeps } from "../app.js";
-import { IMMUTABLE_CACHE_CONTROL } from "../lib/csp.js";
-import { getBytes } from "../lib/s3.js";
+import { ASSET_DOCUMENT_CSP, CURRENT_CACHE_CONTROL } from "../lib/csp.js";
+import { getObjectStream } from "../lib/s3.js";
 import type { AssetRecord } from "../services/assets.js";
 import { getAsset, parseAssetPath } from "../services/assets.js";
 import { isServiceError } from "../services/types.js";
@@ -29,12 +29,38 @@ function matchesEtag(ifNoneMatch: string | string[] | undefined, etag: string): 
   return false;
 }
 
-function sanitizeFilename(filename: string | null): string {
-  if (!filename) {
-    return "file";
+function encodeRfc5987(value: string): string {
+  return encodeURIComponent(value).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
+
+function contentDisposition(filename: string | null): string {
+  const original = filename && filename.length > 0 ? filename : "file";
+  let ascii = "";
+  let hasNonAscii = false;
+  for (const char of original) {
+    const code = char.codePointAt(0) ?? 0;
+    if (char === '"' || char === "\\" || char === "\r" || char === "\n") {
+      continue;
+    }
+    if (code >= 0x20 && code <= 0x7e) {
+      ascii += char;
+      continue;
+    }
+    if (code > 0x7e) {
+      hasNonAscii = true;
+    }
+    ascii += "_";
   }
-  const cleaned = filename.replace(/["\r\n]/g, "");
-  return cleaned.length > 0 ? cleaned : "file";
+  if (ascii.length === 0) {
+    ascii = "file";
+  }
+  if (!hasNonAscii) {
+    return `inline; filename="${ascii}"`;
+  }
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeRfc5987(original)}`;
 }
 
 function parseRangeHeader(
@@ -87,13 +113,15 @@ function applyAssetHeaders(
   reply
     .header("Content-Type", record.contentType)
     .header("Content-Length", String(contentLength))
-    .header("Content-Disposition", `inline; filename="${sanitizeFilename(record.filename)}"`)
-    .header("Cache-Control", IMMUTABLE_CACHE_CONTROL)
+    .header("Content-Disposition", contentDisposition(record.filename))
+    .header("Cache-Control", CURRENT_CACHE_CONTROL)
     .header("ETag", etag)
     .header("Accept-Ranges", "bytes")
     .header("Access-Control-Allow-Origin", "*")
     .header("Cross-Origin-Resource-Policy", "cross-origin")
-    .header("Timing-Allow-Origin", "*");
+    .header("Timing-Allow-Origin", "*")
+    .header("X-Content-Type-Options", "nosniff")
+    .header("Content-Security-Policy", ASSET_DOCUMENT_CSP);
 }
 
 export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
@@ -118,7 +146,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
 
     const etag = `"${record.sha256}"`;
     if (matchesEtag(request.headers["if-none-match"], etag)) {
-      reply.header("ETag", etag).header("Cache-Control", IMMUTABLE_CACHE_CONTROL).code(304).send();
+      reply.header("ETag", etag).header("Cache-Control", CURRENT_CACHE_CONTROL).code(304).send();
       return;
     }
 
@@ -132,24 +160,23 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
       return;
     }
     if (range === null) {
-      const result = await getBytes({
+      const result = await getObjectStream({
         client: deps.s3,
         bucket: deps.config.s3Bucket,
         objectKey: record.objectKey,
       });
-      applyAssetHeaders(reply, record, etag, result.bytes.length);
-      reply.code(200).send(result.bytes);
-      return;
+      applyAssetHeaders(reply, record, etag, result.contentLength);
+      return reply.code(200).send(result.body);
     }
-    const result = await getBytes({
+    const result = await getObjectStream({
       client: deps.s3,
       bucket: deps.config.s3Bucket,
       objectKey: record.objectKey,
       range: `bytes=${range.start}-${range.end}`,
     });
-    applyAssetHeaders(reply, record, etag, result.bytes.length);
+    applyAssetHeaders(reply, record, etag, result.contentLength);
     reply.header("Content-Range", `bytes ${range.start}-${range.end}/${record.byteSize}`);
-    reply.code(206).send(result.bytes);
+    return reply.code(206).send(result.body);
   });
 
   app.all("/*", assetsOnly, async (_request, reply) => {

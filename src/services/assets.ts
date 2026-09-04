@@ -5,7 +5,7 @@ import { assets } from "../db/schema.js";
 import { sha256Hex } from "../lib/hash.js";
 import { localAssetUrl, publicAssetUrl } from "../lib/host.js";
 import { newId } from "../lib/ids.js";
-import { assetObjectKey, deleteObject, getBytes, putBytes } from "../lib/s3.js";
+import { assetObjectKey, deleteObject, putBytes } from "../lib/s3.js";
 import { recordOrphan } from "./orphans.js";
 import type { ServiceError } from "./types.js";
 
@@ -49,10 +49,34 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
   zip: "application/zip",
   json: "application/json",
   txt: "text/plain",
-  html: "text/html",
   css: "text/css",
-  js: "text/javascript",
 };
+
+const BLOCKED_CONTENT_TYPES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+]);
+
+const BLOCKED_EXTENSIONS = new Set(["html", "htm", "js", "mjs", "cjs", "xhtml"]);
+
+function executableWebContentError(
+  contentType: string,
+  filename: string | null,
+): ServiceError | null {
+  const base = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
+  const ext = extensionOf(filename);
+  if (BLOCKED_CONTENT_TYPES.has(base) || (ext !== undefined && BLOCKED_EXTENSIONS.has(ext))) {
+    return {
+      kind: "validation",
+      title: "Invalid asset",
+      detail: "HTML and JavaScript files are not allowed",
+    };
+  }
+  return null;
+}
 
 export function extensionOf(filename: string | null): string | undefined {
   if (!filename) {
@@ -166,6 +190,11 @@ export async function createAsset(input: {
     };
   }
 
+  const blocked = executableWebContentError(input.contentType, input.filename);
+  if (blocked) {
+    return blocked;
+  }
+
   const now = new Date();
   const id = newId();
   const objectKey = assetObjectKey(id, input.filename);
@@ -221,7 +250,14 @@ export async function listAssets(input: {
   db: Database;
   limit: number;
   cursor?: string | undefined;
-}): Promise<{ items: AssetRecord[]; nextCursor: string | null }> {
+}): Promise<{ items: AssetRecord[]; nextCursor: string | null } | ServiceError> {
+  if (input.cursor !== undefined && Number.isNaN(Date.parse(input.cursor))) {
+    return {
+      kind: "validation",
+      title: "Bad Request",
+      detail: "cursor must be an ISO-8601 timestamp",
+    };
+  }
   const cursorFilter = input.cursor ? lt(assets.createdAt, new Date(input.cursor)) : undefined;
   const rows = await input.db
     .select()
@@ -251,7 +287,7 @@ export async function deleteAsset(input: {
   try {
     await deleteObject({ client: input.s3, bucket: input.bucket, objectKey: existing.objectKey });
   } catch {
-    // S3 delete is best-effort; the DB row is the source of truth.
+    await recordOrphan(input.db, existing.objectKey);
   }
   await input.db.delete(assets).where(eq(assets.id, input.id));
   return existing;

@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
@@ -112,12 +113,16 @@ export async function putBytes(input: {
   );
 }
 
-export async function getBytes(input: {
+export async function getObjectStream(input: {
   client: S3Client;
   bucket: string;
   objectKey: string;
   range?: string | undefined;
-}): Promise<{ bytes: Buffer; contentLength: number; contentRange: string | undefined }> {
+}): Promise<{
+  body: Readable;
+  contentLength: number;
+  contentRange: string | undefined;
+}> {
   const result = await input.client.send(
     new GetObjectCommand({
       Bucket: input.bucket,
@@ -129,7 +134,7 @@ export async function getBytes(input: {
     throw new Error(`missing body for ${input.objectKey}`);
   }
   return {
-    bytes: Buffer.from(await result.Body.transformToByteArray()),
+    body: result.Body as Readable,
     contentLength: result.ContentLength ?? 0,
     contentRange: result.ContentRange,
   };

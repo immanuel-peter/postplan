@@ -32,7 +32,7 @@ async function main() {
       port: config.port,
       nodeEnv: config.nodeEnv,
     }),
-    migrationVersion: "0000_init",
+    migrationVersion: "0001_bright_cyclops",
   });
 
   const close = async () => {

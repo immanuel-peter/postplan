@@ -69,3 +69,10 @@ export function localAssetUrl(port: number, id: string, ext?: string | undefined
   const suffix = ext ? `.${ext}` : "";
   return `http://assets.postplan.localhost:${port}/${id}${suffix}`;
 }
+
+export function assetOrigin(input: { baseDomain: string; port: number; nodeEnv: string }): string {
+  if (input.nodeEnv === "development" || input.baseDomain.endsWith(".localhost")) {
+    return `http://assets.postplan.localhost:${input.port}`;
+  }
+  return `https://assets.${input.baseDomain}`;
+}

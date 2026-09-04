@@ -11,6 +11,7 @@ import {
   deleteAsset,
   getAsset,
   listAssets,
+  MAX_ASSET_BYTES,
   toAssetResponse,
 } from "../services/assets.js";
 import {
@@ -890,6 +891,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
       "/assets",
       {
         preValidation: ensureJsonBody,
+        bodyLimit: MAX_ASSET_BYTES + 1024 * 1024,
         schema: {
           tags: ["assets"],
           summary: "Upload an Asset",
@@ -998,6 +1000,9 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           limit: limitParsed.limit,
           ...(cursor !== undefined ? { cursor } : {}),
         });
+        if (isServiceError(listed)) {
+          return sendServiceError(reply, listed);
+        }
         return {
           items: listed.items.map((item) => toAssetResponse(item, deps.assetUrls)),
           nextCursor: listed.nextCursor,

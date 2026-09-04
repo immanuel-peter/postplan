@@ -16,6 +16,7 @@ import {
   formatBytes,
   getAsset,
   listAssets,
+  MAX_ASSET_BYTES,
 } from "../services/assets.js";
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftRecord, VersionRecord } from "../services/types.js";
@@ -69,7 +70,6 @@ type AssetItemRow = {
 };
 
 const LIST_PAGE = 100;
-const DASH_ASSET_MAX = 100 * 1024 * 1024;
 const DASH_ASSET_PAGE = 100;
 const DASH_ASSET_CAP = 2000;
 
@@ -380,6 +380,9 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         limit: DASH_ASSET_PAGE,
         ...(cursor === undefined ? {} : { cursor }),
       });
+      if (isServiceError(page)) {
+        return reply.code(400).type("text/plain").send(page.detail);
+      }
       for (const asset of page.items) {
         if (items.length >= DASH_ASSET_CAP) {
           break;
@@ -412,54 +415,58 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     });
   });
 
-  app.post("/assets", dashboardOnly, async (request, reply) => {
-    if (!isDashboardHost(request)) {
-      return;
-    }
-    let uploads: { bytes: Buffer; filename: string; contentType: string }[];
-    try {
-      uploads = [];
-      const parts = request.parts();
-      for await (const part of parts) {
-        if (part.type !== "file") {
-          continue;
+  app.post(
+    "/assets",
+    { ...dashboardOnly, bodyLimit: MAX_ASSET_BYTES + 1024 * 1024 },
+    async (request, reply) => {
+      if (!isDashboardHost(request)) {
+        return;
+      }
+      let uploads: { bytes: Buffer; filename: string; contentType: string }[];
+      try {
+        uploads = [];
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type !== "file") {
+            continue;
+          }
+          if (part.fieldname !== "file") {
+            await part.toBuffer();
+            continue;
+          }
+          const bytes = await part.toBuffer();
+          if (bytes.byteLength > MAX_ASSET_BYTES) {
+            return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
+          }
+          uploads.push({
+            bytes,
+            filename: part.filename,
+            contentType: part.mimetype || "application/octet-stream",
+          });
         }
-        if (part.fieldname !== "file") {
-          await part.toBuffer();
-          continue;
-        }
-        const bytes = await part.toBuffer();
-        if (bytes.byteLength > DASH_ASSET_MAX) {
-          return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
-        }
-        uploads.push({
-          bytes,
-          filename: part.filename,
-          contentType: part.mimetype || "application/octet-stream",
+      } catch {
+        return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
+      }
+      if (uploads.length === 0) {
+        return reply.code(400).type("text/plain").send("file is required");
+      }
+      for (const upload of uploads) {
+        const created = await createAsset({
+          db: deps.db,
+          s3: deps.s3,
+          bucket: deps.config.s3Bucket,
+          urls: deps.assetUrls,
+          bytes: upload.bytes,
+          filename: upload.filename,
+          contentType: contentTypeForUpload(upload.contentType || undefined, upload.filename),
         });
+        if (isServiceError(created)) {
+          return reply.code(400).type("text/plain").send(created.detail);
+        }
       }
-    } catch {
-      return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
-    }
-    if (uploads.length === 0) {
-      return reply.code(400).type("text/plain").send("file is required");
-    }
-    for (const upload of uploads) {
-      const created = await createAsset({
-        db: deps.db,
-        s3: deps.s3,
-        bucket: deps.config.s3Bucket,
-        urls: deps.assetUrls,
-        bytes: upload.bytes,
-        filename: upload.filename,
-        contentType: contentTypeForUpload(upload.contentType || undefined, upload.filename),
-      });
-      if (isServiceError(created)) {
-        return reply.code(400).type("text/plain").send(created.detail);
-      }
-    }
-    return reply.redirect("/assets");
-  });
+      return reply.redirect("/assets");
+    },
+  );
 
   app.get<{ Params: IdParams }>("/assets/:id", dashboardOnly, async (request, reply) => {
     if (!isDashboardHost(request)) {

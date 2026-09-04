@@ -73,7 +73,7 @@ export async function readAssetUpload(
   const parts = request.parts();
   for await (const part of parts) {
     if (part.type === "file") {
-      if (part.fieldname !== "file") {
+      if (part.fieldname !== "file" || files.length > 0) {
         await part.toBuffer();
         continue;
       }
