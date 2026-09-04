@@ -5,11 +5,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
 import {
   CURRENT_CACHE_CONTROL,
-  DRAFT_CSP,
   IMMUTABLE_CACHE_CONTROL,
   currentEtag,
+  draftCsp,
   versionEtag,
 } from "../lib/csp.js";
+import { assetOrigin } from "../lib/host.js";
 import { getHtml } from "../lib/s3.js";
 import { getVersionForPublic } from "../services/drafts.js";
 
@@ -24,7 +25,7 @@ type VersionParams = {
 
 function draftHostConstraint(baseDomain: string): RegExp {
   const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^[^./]+\\.${escaped}(?::\\d+)?$`, "i");
+  return new RegExp(`^(?!assets\\.)[^./]+\\.${escaped}(?::\\d+)?$`, "i");
 }
 
 function draftSlug(hostKind: FastifyRequest["hostKind"]): string | null {
@@ -32,6 +33,7 @@ function draftSlug(hostKind: FastifyRequest["hostKind"]): string | null {
     case "draft":
       return hostKind.slug;
     case "apex":
+    case "assets":
     case "local":
     case "reject":
       return null;
@@ -76,9 +78,10 @@ function applyDocumentHeaders(
   etag: string,
   cacheControl: string,
   vary: boolean,
+  contentSecurityPolicy: string,
 ): void {
   reply
-    .header("Content-Security-Policy", DRAFT_CSP)
+    .header("Content-Security-Policy", contentSecurityPolicy)
     .header("X-Frame-Options", "DENY")
     .header("Cross-Origin-Opener-Policy", "same-origin")
     .header("ETag", etag)
@@ -94,6 +97,7 @@ async function servePublicHtml(
   deps: AppDeps,
   slug: string,
   versionNumber: number | undefined,
+  contentSecurityPolicy: string,
 ): Promise<void> {
   const found =
     versionNumber === undefined
@@ -111,7 +115,7 @@ async function servePublicHtml(
   const cacheControl = versionNumber === undefined ? CURRENT_CACHE_CONTROL : IMMUTABLE_CACHE_CONTROL;
   const vary = versionNumber === undefined;
 
-  applyDocumentHeaders(reply, etag, cacheControl, vary);
+  applyDocumentHeaders(reply, etag, cacheControl, vary, contentSecurityPolicy);
   if (matchesEtag(request.headers["if-none-match"], etag)) {
     reply.code(304).send();
     return;
@@ -128,6 +132,13 @@ async function servePublicHtml(
 export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   const draftHost = draftHostConstraint(deps.config.baseDomain);
   const draftOnly = { constraints: { host: draftHost } };
+  const contentSecurityPolicy = draftCsp(
+    assetOrigin({
+      baseDomain: deps.config.baseDomain,
+      port: deps.config.port,
+      nodeEnv: deps.config.nodeEnv,
+    }),
+  );
 
   const here = dirname(fileURLToPath(import.meta.url));
   const faviconIco = readFileSync(join(here, "..", "public", "favicon-draft.ico"));
@@ -158,7 +169,7 @@ export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps):
     if (slug === null) {
       return;
     }
-    await servePublicHtml(request, reply, deps, slug, undefined);
+    await servePublicHtml(request, reply, deps, slug, undefined, contentSecurityPolicy);
   });
 
   app.get<{ Params: VersionParams }>("/v/:n", draftOnly, async (request, reply) => {
@@ -171,7 +182,7 @@ export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps):
       sendNotFound(reply);
       return;
     }
-    await servePublicHtml(request, reply, deps, slug, versionNumber);
+    await servePublicHtml(request, reply, deps, slug, versionNumber, contentSecurityPolicy);
   });
 
   app.all("/*", draftOnly, async (_request, reply) => {

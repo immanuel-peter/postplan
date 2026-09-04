@@ -3,8 +3,17 @@ import type { AppDeps } from "../app.js";
 import { requireToken } from "../lib/auth.js";
 import { currentEtag } from "../lib/csp.js";
 import { sha256Hex } from "../lib/hash.js";
-import { optionalField, parseExpectedVersion, readMultipart } from "../lib/multipart.js";
+import { optionalField, parseExpectedVersion, readAssetUpload, readMultipart } from "../lib/multipart.js";
 import { problem, sendProblem } from "../lib/problems.js";
+import {
+  contentTypeForUpload,
+  createAsset,
+  deleteAsset,
+  getAsset,
+  listAssets,
+  MAX_ASSET_BYTES,
+  toAssetResponse,
+} from "../services/assets.js";
 import {
   addVersion,
   createDraft,
@@ -130,6 +139,21 @@ const createdTokenSchema = {
     revokedAt: { type: ["string", "null"] },
     createdAt: { type: "string" },
     token: { type: "string" },
+  },
+};
+
+const assetResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "url", "contentType", "byteSize", "sha256", "filename", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    url: { type: "string" },
+    contentType: { type: "string" },
+    byteSize: { type: "integer" },
+    sha256: { type: "string" },
+    filename: { type: ["string", "null"] },
+    createdAt: { type: "string" },
   },
 };
 
@@ -330,7 +354,7 @@ async function ensureJsonBody(request: FastifyRequest): Promise<void> {
 export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   await app.register(async (api) => {
     api.addHook("onRequest", async (request, reply) => {
-      if (request.hostKind.kind === "draft") {
+      if (request.hostKind.kind === "draft" || request.hostKind.kind === "assets") {
         return reply.code(404).type("text/plain").send("not found");
       }
     });
@@ -860,6 +884,202 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           return sendServiceError(reply, version);
         }
         return toVersionMetadata(version);
+      },
+    );
+
+    api.post(
+      "/assets",
+      {
+        preValidation: ensureJsonBody,
+        bodyLimit: MAX_ASSET_BYTES + 1024 * 1024,
+        schema: {
+          tags: ["assets"],
+          summary: "Upload an Asset",
+          security,
+          consumes: ["multipart/form-data"],
+          body: {
+            type: "object",
+            properties: {
+              file: { type: "string", format: "binary" },
+            },
+          },
+          response: {
+            201: assetResponseSchema,
+            ...errorResponses,
+            413: problemSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const token = await requireToken(request, reply, deps, "drafts:write");
+        if (!token) {
+          return;
+        }
+
+        let upload;
+        try {
+          upload = await readAssetUpload(request);
+        } catch (error: unknown) {
+          if (
+            typeof error === "object" &&
+            error !== null &&
+            "statusCode" in error &&
+            (error as { statusCode?: unknown }).statusCode === 413
+          ) {
+            return sendProblem(
+              reply,
+              problem(413, "Payload Too Large", error instanceof Error ? error.message : "file too large"),
+            );
+          }
+          throw error;
+        }
+        const file = upload.files[0];
+        if (!file) {
+          return sendProblem(reply, problem(400, "Bad Request", "file is required"));
+        }
+
+        const created = await createAsset({
+          db: deps.db,
+          s3: deps.s3,
+          bucket: deps.config.s3Bucket,
+          urls: deps.assetUrls,
+          bytes: file.bytes,
+          filename: file.filename,
+          contentType: contentTypeForUpload(file.mimetype || undefined, file.filename),
+        });
+        if (isServiceError(created)) {
+          return sendServiceError(reply, created);
+        }
+        return reply.code(201).send(toAssetResponse(created, deps.assetUrls));
+      },
+    );
+
+    api.get(
+      "/assets",
+      {
+        schema: {
+          tags: ["assets"],
+          summary: "List Assets",
+          security,
+          querystring: {
+            type: "object",
+            properties: {
+              cursor: { type: "string" },
+              limit: { type: "string" },
+            },
+          },
+          response: {
+            200: {
+              type: "object",
+              required: ["items", "nextCursor"],
+              properties: {
+                items: { type: "array", items: assetResponseSchema },
+                nextCursor: { type: ["string", "null"] },
+              },
+            },
+            400: problemSchema,
+            401: problemSchema,
+            403: problemSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const token = await requireToken(request, reply, deps, "drafts:read");
+        if (!token) {
+          return;
+        }
+
+        const limitParsed = parseListLimit(queryField(request.query, "limit"));
+        if (!limitParsed.ok) {
+          return sendProblem(reply, problem(400, "Bad Request", "limit must be an integer from 1 to 100"));
+        }
+
+        const cursor = queryField(request.query, "cursor");
+        const listed = await listAssets({
+          db: deps.db,
+          limit: limitParsed.limit,
+          ...(cursor !== undefined ? { cursor } : {}),
+        });
+        if (isServiceError(listed)) {
+          return sendServiceError(reply, listed);
+        }
+        return {
+          items: listed.items.map((item) => toAssetResponse(item, deps.assetUrls)),
+          nextCursor: listed.nextCursor,
+        };
+      },
+    );
+
+    api.get<{ Params: { id: string } }>(
+      "/assets/:id",
+      {
+        schema: {
+          tags: ["assets"],
+          summary: "Get an Asset",
+          security,
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+          },
+          response: {
+            200: assetResponseSchema,
+            401: problemSchema,
+            403: problemSchema,
+            404: problemSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const token = await requireToken(request, reply, deps, "drafts:read");
+        if (!token) {
+          return;
+        }
+
+        const record = await getAsset(deps.db, request.params.id);
+        if (isServiceError(record)) {
+          return sendServiceError(reply, record);
+        }
+        return toAssetResponse(record, deps.assetUrls);
+      },
+    );
+
+    api.delete<{ Params: { id: string } }>(
+      "/assets/:id",
+      {
+        schema: {
+          tags: ["assets"],
+          summary: "Delete an Asset",
+          security,
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+          },
+          response: {
+            204: { type: "null", description: "No Content" },
+            401: problemSchema,
+            403: problemSchema,
+            404: problemSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const token = await requireToken(request, reply, deps, "drafts:delete");
+        if (!token) {
+          return;
+        }
+
+        const deleted = await deleteAsset({
+          db: deps.db,
+          s3: deps.s3,
+          bucket: deps.config.s3Bucket,
+          id: request.params.id,
+        });
+        if (isServiceError(deleted)) {
+          return sendServiceError(reply, deleted);
+        }
+        return reply.code(204).send();
       },
     );
 

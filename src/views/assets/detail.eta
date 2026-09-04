@@ -1,0 +1,78 @@
+<% layout("../layouts/main") %>
+<a class="back" href="/assets">← Assets</a>
+<h1><%= it.asset.filename %></h1>
+<p class="public-url-row">
+  <a class="public-url" href="<%= it.asset.previewUrl %>" target="_blank" rel="noreferrer"><%= it.asset.previewUrl %></a>
+</p>
+<div class="preview-card">
+  <% if (it.asset.kind === "image") { %>
+    <img src="<%= it.asset.previewUrl %>" alt="<%= it.asset.filename %>" />
+  <% } else if (it.asset.kind === "video") { %>
+    <video src="<%= it.asset.previewUrl %>" controls preload="metadata"></video>
+  <% } else if (it.asset.kind === "audio") { %>
+    <audio src="<%= it.asset.previewUrl %>" controls></audio>
+  <% } else if (it.asset.kind === "pdf") { %>
+    <embed src="<%= it.asset.previewUrl %>" type="application/pdf" />
+  <% } else { %>
+    <div class="asset-thumb--icon asset-thumb--icon-lg">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6" />
+      </svg>
+      <span><%= it.asset.filename %></span>
+    </div>
+  <% } %>
+</div>
+<h2 class="section-title">Embed</h2>
+<% const rows = [
+  { label: "Direct link", value: it.snippets.direct, id: "embed-direct" },
+  { label: "Markdown", value: it.snippets.markdown, id: "embed-markdown" },
+  { label: "HTML", value: it.snippets.html, id: "embed-html" },
+  { label: "curl", value: it.snippets.curl, id: "embed-curl" },
+]; %>
+<div class="embed-rows">
+  <% for (const row of rows) { %>
+    <div class="embed-row">
+      <span class="embed-label"><%= row.label %></span>
+      <code class="embed-value" id="<%= row.id %>"><%= row.value %></code>
+      <button class="btn-copy copy-btn" type="button" data-copy="<%= row.id %>">Copy</button>
+    </div>
+  <% } %>
+</div>
+<script>
+  (function () {
+    var buttons = document.querySelectorAll("[data-copy]");
+    buttons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        var target = document.getElementById(button.getAttribute("data-copy"));
+        if (!target) return;
+        navigator.clipboard.writeText(target.textContent || "").then(function () {
+          button.textContent = "Copied";
+          setTimeout(function () { button.textContent = "Copy"; }, 1500);
+        });
+      });
+    });
+  })();
+</script>
+<h2 class="section-title">Details</h2>
+<table class="plain">
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>Size</th>
+      <th>Sha-256</th>
+      <th>Uploaded</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mono"><%= it.asset.contentType %></td>
+      <td><%= it.asset.sizeLabel %></td>
+      <td class="mono" title="<%= it.asset.sha256 %>"><%= it.asset.shaShort %></td>
+      <td class="muted mono"><%= it.asset.uploadedLabel %></td>
+    </tr>
+  </tbody>
+</table>
+<form class="delete-form" method="post" action="/assets/<%= it.asset.id %>/delete" onsubmit="return confirm('Delete asset?')">
+  <button class="link-button" type="submit">Delete asset</button>
+</form>

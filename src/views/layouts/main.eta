@@ -19,6 +19,7 @@
     <div class="wrap">
       <nav class="nav" aria-label="Dashboard">
         <a href="/" class="<%= it.active === 'drafts' ? 'active' : '' %>">My drafts</a>
+        <a href="/assets" class="<%= it.active === 'assets' ? 'active' : '' %>">Assets</a>
         <a href="/keys" class="<%= it.active === 'keys' ? 'active' : '' %>">API keys</a>
       </nav>
       <%~ it.body %>

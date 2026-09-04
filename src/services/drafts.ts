@@ -8,7 +8,7 @@ import { isHtmlValidationError, validateHtml } from "../lib/html.js";
 import { localDraftUrl, publicDraftUrl } from "../lib/host.js";
 import { newId } from "../lib/ids.js";
 import { versionObjectKey, putHtml } from "../lib/s3.js";
-import { generateSlug } from "../lib/slug.js";
+import { generateSlug, isReservedSlug } from "../lib/slug.js";
 import { recordOrphan } from "./orphans.js";
 import type { DraftRecord, DraftResponse, DraftStatus, ServiceError, VersionRecord } from "./types.js";
 
@@ -89,6 +89,9 @@ export function toDraftResponse(input: {
 async function uniqueSlug(db: Database): Promise<string> {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const slug = generateSlug();
+    if (isReservedSlug(slug)) {
+      continue;
+    }
     const [existing] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.slug, slug)).limit(1);
     if (!existing) {
       return slug;

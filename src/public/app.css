@@ -378,3 +378,240 @@ pre,
 code {
   font-size: 0.88em;
 }
+
+/* Assets */
+
+.dropzone {
+  margin: 0 0 2.25rem;
+  padding: 2.25rem 1.5rem;
+  border: 2px dashed var(--input-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: center;
+}
+
+.dropzone.dragover {
+  border-color: var(--link);
+  background: color-mix(in srgb, var(--link) 5%, var(--surface));
+}
+
+.dropzone-icon {
+  color: var(--muted);
+}
+
+.dropzone-line {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.browse-label {
+  color: var(--link);
+  cursor: pointer;
+}
+
+.browse-label:hover {
+  text-decoration: underline;
+}
+
+.dropzone-sub {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.assets-error {
+  margin: 0.85rem 0 0;
+  color: #8a2b1a;
+  font-size: 0.9rem;
+}
+
+.assets-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.assets-count {
+  color: var(--muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.25rem 1rem;
+}
+
+.asset-card {
+  min-width: 0;
+}
+
+.asset-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.asset-thumb img,
+.asset-thumb video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.asset-thumb:hover {
+  border-color: var(--muted);
+}
+
+.asset-thumb--icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+.asset-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.asset-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.8rem;
+}
+
+.asset-size {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.play-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+.play-overlay::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-35%, -50%);
+  border-left: 14px solid #fff;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+}
+
+.preview-card {
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.preview-card img {
+  max-width: 100%;
+  max-height: 60vh;
+  border-radius: 8px;
+}
+
+.preview-card video {
+  width: 100%;
+  max-height: 60vh;
+  border-radius: 8px;
+  background: #000;
+}
+
+.preview-card audio {
+  width: 100%;
+}
+
+.preview-card embed {
+  width: 100%;
+  min-height: 400px;
+  height: 60vh;
+  border: 0;
+}
+
+.asset-thumb--icon-lg {
+  min-height: 240px;
+  border-radius: 8px;
+}
+
+.embed-rows {
+  margin: 1rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.embed-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.embed-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.embed-value {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .embed-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .embed-label {
+    grid-column: 1 / -1;
+  }
+}

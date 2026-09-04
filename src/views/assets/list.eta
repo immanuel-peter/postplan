@@ -1,0 +1,92 @@
+<% layout("../layouts/main") %>
+<h1>Assets</h1>
+<p class="lede">Immutable files with a stable public URL. Upload here or with <code>curl -F "file=@photo.png"</code>.</p>
+<div class="dropzone" id="dropzone">
+  <svg class="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 16V4" />
+    <path d="M7 9l5-5 5 5" />
+    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+  </svg>
+  <p class="dropzone-line"><strong>Drop files here, or</strong> <label class="browse-label" for="file-input">browse</label></p>
+  <p class="dropzone-sub muted">Images, video, documents — up to 100 MB each</p>
+  <input id="file-input" type="file" multiple hidden />
+  <p class="assets-error" id="assets-error" hidden></p>
+</div>
+<script>
+  (function () {
+    var zone = document.getElementById("dropzone");
+    var input = document.getElementById("file-input");
+    var error = document.getElementById("assets-error");
+    if (!zone || !input) return;
+    function showError(message) {
+      if (!error) return;
+      error.textContent = message;
+      error.hidden = false;
+    }
+    async function upload(files) {
+      if (error) error.hidden = true;
+      for (var i = 0; i < files.length; i++) {
+        var form = new FormData();
+        form.append("file", files[i]);
+        var res = await fetch("/assets", { method: "POST", body: form });
+        if (!res.ok) {
+          showError("Upload failed: " + files[i].name);
+          return;
+        }
+      }
+      window.location.reload();
+    }
+    ["dragenter", "dragover"].forEach(function (name) {
+      zone.addEventListener(name, function (e) {
+        e.preventDefault();
+        zone.classList.add("dragover");
+      });
+    });
+    ["dragleave", "drop"].forEach(function (name) {
+      zone.addEventListener(name, function (e) {
+        e.preventDefault();
+        zone.classList.remove("dragover");
+      });
+    });
+    zone.addEventListener("drop", function (e) {
+      if (e.dataTransfer && e.dataTransfer.files.length) upload(e.dataTransfer.files);
+    });
+    input.addEventListener("change", function () {
+      if (input.files && input.files.length) upload(input.files);
+    });
+  })();
+</script>
+<div class="assets-head">
+  <h2>All assets</h2>
+  <span class="assets-count"><%= it.summary %></span>
+</div>
+<% if (it.items.length === 0) { %>
+  <p class="muted">No assets yet. Drop a file above or upload with curl.</p>
+<% } else { %>
+  <div class="assets-grid">
+    <% for (const item of it.items) { %>
+      <article class="asset-card">
+        <a class="asset-thumb" href="<%= item.detailUrl %>">
+          <% if (item.kind === "image") { %>
+            <img src="<%= item.thumbUrl %>" alt="<%= item.filename %>" loading="lazy" />
+          <% } else if (item.kind === "video") { %>
+            <video src="<%= item.thumbUrl %>" muted preload="metadata" playsinline></video>
+            <span class="play-overlay" aria-hidden="true"></span>
+          <% } else { %>
+            <span class="asset-thumb--icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+              </svg>
+              <% if (item.extLabel) { %><span><%= item.extLabel %></span><% } %>
+            </span>
+          <% } %>
+        </a>
+        <div class="asset-meta">
+          <a class="asset-name" href="<%= item.detailUrl %>" title="<%= item.filename %>"><%= item.filename %></a>
+          <span class="asset-size"><%= item.sizeLabel %></span>
+        </div>
+      </article>
+    <% } %>
+  </div>
+<% } %>

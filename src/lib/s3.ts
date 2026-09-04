@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import {
   CreateBucketCommand,
   DeleteObjectCommand,
@@ -76,4 +77,65 @@ export async function deleteObject(input: {
 
 export function versionObjectKey(draftId: string, version: number): string {
   return `drafts/${draftId}/versions/${version}.html`;
+}
+
+export function assetObjectKey(id: string, filename: string | null): string {
+  let name = filename ?? "";
+  const slash = Math.max(name.lastIndexOf("/"), name.lastIndexOf("\\"));
+  if (slash >= 0) {
+    name = name.slice(slash + 1);
+  }
+  name = name.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_");
+  name = name.replace(/^\.+/, "");
+  if (name.length === 0) {
+    name = "file";
+  }
+  if (name.length > 180) {
+    name = name.slice(0, 180);
+  }
+  return `assets/${id}/${name}`;
+}
+
+export async function putBytes(input: {
+  client: S3Client;
+  bucket: string;
+  objectKey: string;
+  bytes: Buffer;
+  contentType: string;
+}): Promise<void> {
+  await input.client.send(
+    new PutObjectCommand({
+      Bucket: input.bucket,
+      Key: input.objectKey,
+      Body: input.bytes,
+      ContentType: input.contentType,
+    }),
+  );
+}
+
+export async function getObjectStream(input: {
+  client: S3Client;
+  bucket: string;
+  objectKey: string;
+  range?: string | undefined;
+}): Promise<{
+  body: Readable;
+  contentLength: number;
+  contentRange: string | undefined;
+}> {
+  const result = await input.client.send(
+    new GetObjectCommand({
+      Bucket: input.bucket,
+      Key: input.objectKey,
+      Range: input.range,
+    }),
+  );
+  if (!result.Body) {
+    throw new Error(`missing body for ${input.objectKey}`);
+  }
+  return {
+    body: result.Body as Readable,
+    contentLength: result.ContentLength ?? 0,
+    contentRange: result.ContentRange,
+  };
 }

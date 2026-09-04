@@ -9,6 +9,15 @@ import {
   patchDraft,
   type DraftUrls,
 } from "../services/drafts.js";
+import {
+  contentTypeForUpload,
+  createAsset,
+  deleteAsset,
+  formatBytes,
+  getAsset,
+  listAssets,
+  MAX_ASSET_BYTES,
+} from "../services/assets.js";
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftRecord, VersionRecord } from "../services/types.js";
 import { isServiceError } from "../services/types.js";
@@ -50,7 +59,19 @@ type TokenRow = {
   lastUsedLabel: string;
 };
 
+type AssetItemRow = {
+  id: string;
+  filename: string;
+  detailUrl: string;
+  thumbUrl: string;
+  sizeLabel: string;
+  kind: "image" | "video" | "audio" | "pdf" | "other";
+  extLabel: string;
+};
+
 const LIST_PAGE = 100;
+const DASH_ASSET_PAGE = 100;
+const DASH_ASSET_CAP = 2000;
 
 function dashboardHostConstraint(baseDomain: string): RegExp {
   const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -64,6 +85,7 @@ function isDashboardHost(request: FastifyRequest): boolean {
     case "local":
       return true;
     case "draft":
+    case "assets":
     case "reject":
       return false;
     default: {
@@ -170,6 +192,37 @@ function toVersionRow(version: VersionRecord, versionUrl: string): VersionRow {
     refLabel: refLabel(version.gitRef, version.gitCommit),
     publishedLabel: formatStamp(version.createdAt),
   };
+}
+
+function assetKindFromContentType(contentType: string): AssetItemRow["kind"] {
+  const ct = contentType.toLowerCase();
+  if (ct.startsWith("image/")) {
+    return "image";
+  }
+  if (ct.startsWith("video/")) {
+    return "video";
+  }
+  if (ct.startsWith("audio/")) {
+    return "audio";
+  }
+  if (ct === "application/pdf") {
+    return "pdf";
+  }
+  return "other";
+}
+
+function assetExtLabel(filename: string): string {
+  const base = filename.split("/").pop() ?? filename;
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0 || dot === base.length - 1) {
+    return "";
+  }
+  return base.slice(dot + 1).toUpperCase();
+}
+
+function assetDisplayName(filename: string | null | undefined): string {
+  const trimmed = filename?.trim() ?? "";
+  return trimmed === "" ? "unnamed" : trimmed;
 }
 
 async function loadActiveDrafts(db: AppDeps["db"]): Promise<DraftRecord[]> {
@@ -312,5 +365,157 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       return reply.code(404).type("text/plain").send("not found");
     }
     return reply.redirect("/keys");
+  });
+
+  app.get("/assets", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    const items: AssetItemRow[] = [];
+    let totalBytes = 0;
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await listAssets({
+        db: deps.db,
+        limit: DASH_ASSET_PAGE,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      if (isServiceError(page)) {
+        return reply.code(400).type("text/plain").send(page.detail);
+      }
+      for (const asset of page.items) {
+        if (items.length >= DASH_ASSET_CAP) {
+          break;
+        }
+        const filename = assetDisplayName(asset.filename);
+        totalBytes += asset.byteSize;
+        items.push({
+          id: asset.id,
+          filename,
+          detailUrl: `/assets/${asset.id}`,
+          thumbUrl: deps.assetUrls.publicUrl(asset.id, asset.filename),
+          sizeLabel: formatBytes(asset.byteSize),
+          kind: assetKindFromContentType(asset.contentType),
+          extLabel: assetExtLabel(filename),
+        });
+      }
+      if (items.length >= DASH_ASSET_CAP) {
+        break;
+      }
+      if (page.nextCursor == null) {
+        break;
+      }
+      cursor = page.nextCursor;
+    }
+    return reply.view("assets/list", {
+      title: "Assets",
+      active: "assets",
+      items,
+      summary: `${String(items.length)} file(s) · ${formatBytes(totalBytes)}`,
+    });
+  });
+
+  app.post(
+    "/assets",
+    { ...dashboardOnly, bodyLimit: MAX_ASSET_BYTES + 1024 * 1024 },
+    async (request, reply) => {
+      if (!isDashboardHost(request)) {
+        return;
+      }
+      let uploads: { bytes: Buffer; filename: string; contentType: string }[];
+      try {
+        uploads = [];
+        const parts = request.parts();
+        for await (const part of parts) {
+          if (part.type !== "file") {
+            continue;
+          }
+          if (part.fieldname !== "file") {
+            await part.toBuffer();
+            continue;
+          }
+          const bytes = await part.toBuffer();
+          if (bytes.byteLength > MAX_ASSET_BYTES) {
+            return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
+          }
+          uploads.push({
+            bytes,
+            filename: part.filename,
+            contentType: part.mimetype || "application/octet-stream",
+          });
+        }
+      } catch {
+        return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
+      }
+      if (uploads.length === 0) {
+        return reply.code(400).type("text/plain").send("file is required");
+      }
+      for (const upload of uploads) {
+        const created = await createAsset({
+          db: deps.db,
+          s3: deps.s3,
+          bucket: deps.config.s3Bucket,
+          urls: deps.assetUrls,
+          bytes: upload.bytes,
+          filename: upload.filename,
+          contentType: contentTypeForUpload(upload.contentType || undefined, upload.filename),
+        });
+        if (isServiceError(created)) {
+          return reply.code(400).type("text/plain").send(created.detail);
+        }
+      }
+      return reply.redirect("/assets");
+    },
+  );
+
+  app.get<{ Params: IdParams }>("/assets/:id", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    const asset = await getAsset(deps.db, request.params.id);
+    if (isServiceError(asset)) {
+      return reply.code(404).type("text/plain").send("not found");
+    }
+    const filename = assetDisplayName(asset.filename);
+    const dot = filename.lastIndexOf(".");
+    const base = dot > 0 ? filename.slice(0, dot) : filename;
+    const previewUrl = deps.assetUrls.publicUrl(asset.id, asset.filename);
+    return reply.view("assets/detail", {
+      title: filename,
+      active: "assets",
+      asset: {
+        id: asset.id,
+        filename,
+        previewUrl,
+        kind: assetKindFromContentType(asset.contentType),
+        contentType: asset.contentType,
+        sizeLabel: formatBytes(asset.byteSize),
+        sha256: asset.sha256,
+        shaShort: asset.sha256.length > 20 ? `${asset.sha256.slice(0, 20)}…` : asset.sha256,
+        uploadedLabel: formatStamp(asset.createdAt),
+      },
+      snippets: {
+        direct: previewUrl,
+        markdown: `![${base}](${previewUrl})`,
+        html: `<img src="${previewUrl}" alt="${base}">`,
+        curl: `curl -O ${previewUrl}`,
+      },
+    });
+  });
+
+  app.post<{ Params: IdParams }>("/assets/:id/delete", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    const deleted = await deleteAsset({
+      db: deps.db,
+      s3: deps.s3,
+      bucket: deps.config.s3Bucket,
+      id: request.params.id,
+    });
+    if (isServiceError(deleted)) {
+      return reply.code(404).type("text/plain").send("not found");
+    }
+    return reply.redirect("/assets");
   });
 }

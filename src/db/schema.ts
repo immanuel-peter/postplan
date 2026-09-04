@@ -79,3 +79,17 @@ export const orphanObjects = pgTable("orphan_objects", {
   objectKey: text("object_key").primaryKey(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
 });
+
+export const assets = pgTable(
+  "assets",
+  {
+    id: text("id").primaryKey(),
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    sha256: text("sha256").notNull(),
+    objectKey: text("object_key").notNull().unique(),
+    filename: text("filename"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("assets_created_at_idx").on(t.createdAt)],
+);
