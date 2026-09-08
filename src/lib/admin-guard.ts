@@ -58,6 +58,19 @@ export function registerAdminGuard(app: FastifyInstance, deps: AppDeps): void {
       return;
     }
 
+    // WebAuthn is pinned to the configured origin, so `localhost` and `127.0.0.1` can never complete
+    // a ceremony: the RP ID is not a suffix of those hosts. Send browsers to the canonical origin
+    // instead of letting them dead-end. Health and static paths still answer on any alias.
+    if (
+      request.hostKind.kind === "local" &&
+      isRead(request.method) &&
+      !path.startsWith("/static/") &&
+      path !== "/healthz" &&
+      path !== "/readyz"
+    ) {
+      return reply.redirect(`${rp.origin}${request.url}`);
+    }
+
     const token = readCookie(request.headers.cookie, cookieName);
     if (token !== null) {
       const session = await authenticateSession({

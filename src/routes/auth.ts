@@ -193,6 +193,9 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     }
     const state = await setupState(deps.db);
     if (!state.closed) {
+      if (deps.config.adminSetupSecret === null) {
+        return reply.code(503).view("auth/unconfigured", { title: "Setup not configured" });
+      }
       return reply.redirect("/setup");
     }
     if (request.adminSession) {
@@ -212,6 +215,9 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     }
     noStore(reply);
     const state = await setupState(deps.db);
+    if (!state.closed && deps.config.adminSetupSecret === null) {
+      return reply.code(503).view("auth/unconfigured", { title: "Setup not configured" });
+    }
     const mode = setupMode(state, deps);
     if (mode === null) {
       return reply.redirect("/unlock");
@@ -232,6 +238,9 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       return reply.code(403).type("text/plain").send("bad origin");
     }
     const state = await setupState(deps.db);
+    if (!state.closed && deps.config.adminSetupSecret === null) {
+      return reply.code(503).view("auth/unconfigured", { title: "Setup not configured" });
+    }
     const mode = setupMode(state, deps);
     if (mode === null) {
       return reply.redirect("/unlock");
@@ -270,7 +279,12 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       authenticatorSelection: { residentKey: "required", userVerification: "required" },
     });
     const operation: ChallengeOperation = mode === "recovery" ? "register_recovery" : "register_setup";
-    const id = await createChallenge(deps.db, operation, options.challenge);
+    const id = await createChallenge(
+      deps.db,
+      operation,
+      options.challenge,
+      mode === "recovery" ? hashToken(expected, deps.config.tokenPepper) : null,
+    );
     setChallengeCookie(reply, rp, id);
     return reply.view("auth/enroll", {
       title: "Add your passkey",
@@ -319,10 +333,11 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     if (challengeId === null) {
       return problem(reply, 400, "challenge expired");
     }
-    const expectedChallenge = await consumeChallenge(deps.db, challengeId, "authenticate");
-    if (expectedChallenge === null) {
+    const consumed = await consumeChallenge(deps.db, challengeId, "authenticate");
+    if (consumed === null) {
       return problem(reply, 400, "challenge expired");
     }
+    const expectedChallenge = consumed.challenge;
     const response = request.body as AuthenticationResponseJSON | undefined;
     if (!response || typeof response.id !== "string") {
       return problem(reply, 400, "malformed response");
@@ -470,13 +485,17 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       }
     } else if (operation.operation === "register_recovery") {
       const recoverySecret = deps.config.adminRecoverySecret;
-      if (recoverySecret === null) {
+      if (recoverySecret === null || operation.secretHash === null) {
         return problem(reply, 409, "recovery not available");
+      }
+      // Reject a challenge authorized by a secret that has since been rotated, so enrollment can
+      // never consume a secret this browser never proved.
+      if (!hashesEqual(operation.secretHash, hashToken(recoverySecret, deps.config.tokenPepper))) {
+        return problem(reply, 409, "recovery secret rotated");
       }
       const created = await enrollRecoveryCredential(deps.db, {
         ...record,
-        pepper: deps.config.tokenPepper,
-        recoverySecret,
+        authorizedHash: operation.secretHash,
       });
       if (!created) {
         return problem(reply, 409, "recovery secret already used");
@@ -518,7 +537,7 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       return;
     }
     noStore(reply);
-    return renderSecurity(reply, deps, request);
+    return reply.view("auth/security", await securityViewModel(deps, request));
   });
 
   app.post<{ Params: IdParams }>(
@@ -529,8 +548,15 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
         return;
       }
       const removed = await removeCredential(deps.db, request.params.id);
-      if (!removed) {
+      if (removed === "not_found") {
         return reply.code(404).type("text/plain").send("not found");
+      }
+      if (removed === "last_credential") {
+        noStore(reply);
+        return reply.code(409).view("auth/security", {
+          ...(await securityViewModel(deps, request)),
+          error: "That is your only passkey. Add another one before removing it.",
+        });
       }
       return reply.redirect("/security");
     },
@@ -561,35 +587,38 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     return reply.redirect("/unlock");
   });
 
-  async function renderSecurity(
-    reply: FastifyReply,
-    appDeps: AppDeps,
-    request: FastifyRequest,
-  ): Promise<unknown> {
-    const [credentials, sessions] = await Promise.all([
-      listCredentials(appDeps.db),
-      listSessions(appDeps.db),
-    ]);
-    return reply.view("auth/security", {
-      title: "Security",
-      active: "security",
-      csrf: request.adminCsrf,
-      passkeys: credentials.map((credential) => ({
-        id: credential.id,
-        name: credential.name,
-        transports: credential.transports.join(", "),
-        createdLabel: formatStamp(credential.createdAt),
-        lastUsedLabel: formatStamp(credential.lastUsedAt),
-      })),
-      sessions: sessions.map((session) => ({
-        id: session.id,
-        label: deviceLabel(session.userAgent),
-        current: session.id === request.adminSession?.id,
-        createdLabel: formatStamp(session.createdAt),
-        expiresLabel: expiresLabel(session.expiresAt),
-      })),
-    });
-  }
+}
+
+async function securityViewModel(
+  deps: AppDeps,
+  request: FastifyRequest,
+): Promise<Record<string, unknown>> {
+  const [credentials, sessions] = await Promise.all([
+    listCredentials(deps.db),
+    listSessions(deps.db),
+  ]);
+  return {
+    title: "Security",
+    active: "security",
+    csrf: request.adminCsrf,
+    error: null,
+    // The last passkey cannot be removed, so the page does not offer it.
+    removable: credentials.length > 1,
+    passkeys: credentials.map((credential) => ({
+      id: credential.id,
+      name: credential.name,
+      transports: credential.transports.join(", "),
+      createdLabel: formatStamp(credential.createdAt),
+      lastUsedLabel: formatStamp(credential.lastUsedAt),
+    })),
+    sessions: sessions.map((session) => ({
+      id: session.id,
+      label: deviceLabel(session.userAgent),
+      current: session.id === request.adminSession?.id,
+      createdLabel: formatStamp(session.createdAt),
+      expiresLabel: expiresLabel(session.expiresAt),
+    })),
+  };
 }
 
 function setupMode(
@@ -613,11 +642,11 @@ function setupMode(
 async function resolveRegisterOperation(
   deps: AppDeps,
   challengeId: string,
-): Promise<{ operation: ChallengeOperation; challenge: string } | null> {
+): Promise<{ operation: ChallengeOperation; challenge: string; secretHash: string | null } | null> {
   for (const operation of ["register_setup", "register_recovery", "register_add"] as const) {
-    const challenge = await consumeChallenge(deps.db, challengeId, operation);
-    if (challenge !== null) {
-      return { operation, challenge };
+    const consumed = await consumeChallenge(deps.db, challengeId, operation);
+    if (consumed !== null) {
+      return { operation, ...consumed };
     }
   }
   return null;

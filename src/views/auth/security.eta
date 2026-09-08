@@ -1,7 +1,7 @@
 <% layout("../layouts/main") %>
 <h1>Security</h1>
 <p class="lede">Passkeys that can unlock this dashboard, and the browsers currently signed in.</p>
-<p class="alert-error" id="passkey-error" hidden></p>
+<p class="alert-error" id="passkey-error"<% if (!it.error) { %> hidden<% } %>><%= it.error ?? "" %></p>
 
 <h2 class="section-title">Passkeys</h2>
 <table class="plain">
@@ -26,17 +26,25 @@
         <td class="muted"><%= passkey.createdLabel %></td>
         <td class="muted"><%= passkey.lastUsedLabel %></td>
         <td class="revoke-cell">
-          <form method="post" action="/security/passkeys/<%= passkey.id %>/delete">
-            <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-            <button class="link-button" type="submit">Remove</button>
-          </form>
+          <% if (it.removable) { %>
+            <form method="post" action="/security/passkeys/<%= passkey.id %>/delete">
+              <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+              <button class="link-button" type="submit">Remove</button>
+            </form>
+          <% } else { %>
+            <span class="muted">—</span>
+          <% } %>
         </td>
       </tr>
     <% } %>
   </tbody>
 </table>
 <button class="btn-primary btn-compact" type="button" id="add-passkey">Add a passkey</button>
-<p class="note">Adding a passkey asks for Touch ID again first.</p>
+<% if (it.removable) { %>
+  <p class="note">Adding a passkey asks for Touch ID again first.</p>
+<% } else { %>
+  <p class="note">Adding a passkey asks for Touch ID again first. Your only passkey cannot be removed — add a second one first, so a lost device doesn’t lock you out.</p>
+<% } %>
 
 <h2 class="section-title">Sessions</h2>
 <table class="plain">

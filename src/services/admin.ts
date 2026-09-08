@@ -99,12 +99,28 @@ export async function addCredential(db: Database, input: NewCredential): Promise
   return toCredential(row);
 }
 
-export async function removeCredential(db: Database, id: string): Promise<boolean> {
-  const removed = await db
-    .delete(adminCredentials)
-    .where(eq(adminCredentials.id, id))
-    .returning({ id: adminCredentials.id });
-  return removed.length > 0;
+export type RemoveCredentialResult = "removed" | "not_found" | "last_credential";
+
+/**
+ * The last passkey may never be removed: setup stays closed forever, so a deployment with no
+ * credential is locked out until someone redeploys with a recovery secret. Locking every row makes
+ * two concurrent deletes serialize instead of both seeing a survivor.
+ */
+export async function removeCredential(
+  db: Database,
+  id: string,
+): Promise<RemoveCredentialResult> {
+  return db.transaction(async (tx) => {
+    const rows = await tx.select({ id: adminCredentials.id }).from(adminCredentials).for("update");
+    if (!rows.some((row) => row.id === id)) {
+      return "not_found";
+    }
+    if (rows.length <= 1) {
+      return "last_credential";
+    }
+    await tx.delete(adminCredentials).where(eq(adminCredentials.id, id));
+    return "removed";
+  });
 }
 
 export async function markCredentialUsed(
@@ -156,9 +172,9 @@ export async function enrollFirstCredential(
  */
 export async function enrollRecoveryCredential(
   db: Database,
-  input: NewCredential & { pepper: string; recoverySecret: string },
+  input: NewCredential & { authorizedHash: string },
 ): Promise<CredentialRecord | null> {
-  const hash = hashToken(input.recoverySecret, input.pepper);
+  const hash = input.authorizedHash;
   return db.transaction(async (tx) => {
     const [row] = await tx
       .select()
@@ -197,6 +213,7 @@ export async function createChallenge(
   db: Database,
   operation: ChallengeOperation,
   challenge: string,
+  secretHash: string | null = null,
 ): Promise<string> {
   const now = new Date();
   const id = newSecret();
@@ -205,18 +222,24 @@ export async function createChallenge(
     id,
     challenge,
     operation,
+    secretHash,
     createdAt: now,
     expiresAt: new Date(now.getTime() + CHALLENGE_TTL_MS),
   });
   return id;
 }
 
+export type ConsumedChallenge = {
+  challenge: string;
+  secretHash: string | null;
+};
+
 /** Deleting on read makes a challenge single-use, so a captured response cannot be replayed. */
 export async function consumeChallenge(
   db: Database,
   id: string,
   operation: ChallengeOperation,
-): Promise<string | null> {
+): Promise<ConsumedChallenge | null> {
   const [row] = await db
     .delete(adminChallenges)
     .where(
@@ -226,8 +249,8 @@ export async function consumeChallenge(
         gt(adminChallenges.expiresAt, new Date()),
       ),
     )
-    .returning({ challenge: adminChallenges.challenge });
-  return row?.challenge ?? null;
+    .returning({ challenge: adminChallenges.challenge, secretHash: adminChallenges.secretHash });
+  return row ?? null;
 }
 
 export async function createSession(input: {

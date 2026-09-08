@@ -122,6 +122,7 @@ export const adminChallenges = pgTable(
     id: text("id").primaryKey(),
     challenge: text("challenge").notNull(),
     operation: text("operation").notNull(),
+    secretHash: text("secret_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
