@@ -27,8 +27,9 @@
       if (error) error.hidden = true;
       for (var i = 0; i < files.length; i++) {
         var form = new FormData();
+        form.append("_csrf", <%~ JSON.stringify(it.csrf) %>);
         form.append("file", files[i]);
-        var res = await fetch("/assets", { method: "POST", body: form });
+        var res = await fetch("/assets", { method: "POST", body: form, credentials: "same-origin" });
         if (!res.ok) {
           showError("Upload failed: " + files[i].name);
           return;

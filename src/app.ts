@@ -10,15 +10,18 @@ import Fastify from "fastify";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
+import { registerAdminGuard } from "./lib/admin-guard.js";
 import { classifyHost } from "./lib/host.js";
 import { MAX_HTML_BYTES } from "./lib/html.js";
 import { registerApiRoutes } from "./routes/api.js";
+import { registerAuthRoutes } from "./routes/auth.js";
 import { registerAssetPublicRoutes } from "./routes/assets-public.js";
 import { registerDashboardRoutes } from "./routes/dashboard.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerPublicRoutes } from "./routes/public.js";
 import { MAX_ASSET_BYTES, type AssetUrls } from "./services/assets.js";
 import type { DraftUrls } from "./services/drafts.js";
+import type { SessionRecord } from "./services/admin.js";
 import type { TokenRecord } from "./services/types.js";
 
 export type AppDeps = {
@@ -34,6 +37,8 @@ declare module "fastify" {
   interface FastifyRequest {
     hostKind: ReturnType<typeof classifyHost>;
     apiToken: TokenRecord | null;
+    adminSession: SessionRecord | null;
+    adminCsrf: string | null;
   }
 }
 
@@ -48,6 +53,8 @@ export async function buildApp(deps: AppDeps) {
 
   app.decorateRequest("hostKind", null);
   app.decorateRequest("apiToken", null);
+  app.decorateRequest("adminSession", null);
+  app.decorateRequest("adminCsrf", null);
 
   await app.register(swagger, {
     openapi: {
@@ -124,8 +131,11 @@ export async function buildApp(deps: AppDeps) {
     }
   });
 
+  registerAdminGuard(app, deps);
+
   registerHealthRoutes(app, deps);
   await registerApiRoutes(app, deps);
+  await registerAuthRoutes(app, deps);
   await registerPublicRoutes(app, deps);
   await registerAssetPublicRoutes(app, deps);
   await registerDashboardRoutes(app, deps);
@@ -137,6 +147,11 @@ export async function buildApp(deps: AppDeps) {
   const css = readFileSync(join(here, "public", "app.css"), "utf8");
   app.get("/static/app.css", async (_request, reply) => {
     return reply.type("text/css; charset=utf-8").send(css);
+  });
+
+  const webauthnJs = readFileSync(join(here, "public", "webauthn.js"), "utf8");
+  app.get("/static/webauthn.js", async (_request, reply) => {
+    return reply.type("text/javascript; charset=utf-8").send(webauthnJs);
   });
 
   const faviconSvg = readFileSync(join(here, "public", "favicon.svg"));

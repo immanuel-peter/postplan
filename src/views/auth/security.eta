@@ -1,0 +1,120 @@
+<% layout("../layouts/main") %>
+<h1>Security</h1>
+<p class="lede">Passkeys that can unlock this dashboard, and the browsers currently signed in.</p>
+<p class="alert-error" id="passkey-error"<% if (!it.error) { %> hidden<% } %>><%= it.error ?? "" %></p>
+
+<h2 class="section-title">Passkeys</h2>
+<table class="plain">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Added</th>
+      <th>Last used</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (it.passkeys.length === 0) { %>
+      <tr><td class="muted" colspan="4">No passkeys.</td></tr>
+    <% } %>
+    <% for (const passkey of it.passkeys) { %>
+      <tr>
+        <td>
+          <div><%= passkey.name %></div>
+          <% if (passkey.transports) { %><div class="prefix"><%= passkey.transports %></div><% } %>
+        </td>
+        <td class="muted"><%= passkey.createdLabel %></td>
+        <td class="muted"><%= passkey.lastUsedLabel %></td>
+        <td class="revoke-cell">
+          <% if (it.removable) { %>
+            <form method="post" action="/security/passkeys/<%= passkey.id %>/delete">
+              <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+              <button class="link-button" type="submit">Remove</button>
+            </form>
+          <% } else { %>
+            <span class="muted">—</span>
+          <% } %>
+        </td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>
+<button class="btn-primary btn-compact" type="button" id="add-passkey">Add a passkey</button>
+<% if (it.removable) { %>
+  <p class="note">Adding a passkey asks for Touch ID again first.</p>
+<% } else { %>
+  <p class="note">Adding a passkey asks for Touch ID again first. Your only passkey cannot be removed — add a second one first, so a lost device doesn’t lock you out.</p>
+<% } %>
+
+<h2 class="section-title">Sessions</h2>
+<table class="plain">
+  <thead>
+    <tr>
+      <th>Browser</th>
+      <th>Signed in</th>
+      <th>Expires</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <% for (const session of it.sessions) { %>
+      <tr>
+        <td>
+          <div><%= session.label %><% if (session.current) { %><span class="chip-dirty">This device</span><% } %></div>
+        </td>
+        <td class="muted"><%= session.createdLabel %></td>
+        <td class="muted"><%= session.expiresLabel %></td>
+        <td class="revoke-cell">
+          <% if (!session.current) { %>
+            <form method="post" action="/security/sessions/<%= session.id %>/revoke">
+              <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+              <button class="link-button" type="submit">Revoke</button>
+            </form>
+          <% } else { %>
+            <span class="muted">—</span>
+          <% } %>
+        </td>
+      </tr>
+    <% } %>
+  </tbody>
+</table>
+<form method="post" action="/security/sessions/revoke-all" class="revoke-all">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+  <button class="link-button" type="submit">Sign out everywhere</button>
+</form>
+<p class="note">Sessions last 7 days. Locking ends this one only.</p>
+
+<script src="/static/webauthn.js"></script>
+<script>
+  (function () {
+    var button = document.getElementById("add-passkey");
+    var error = document.getElementById("passkey-error");
+    var csrf = <%~ JSON.stringify(it.csrf) %>;
+
+    button.addEventListener("click", async function () {
+      error.hidden = true;
+      button.disabled = true;
+      var name = window.prompt("Name this passkey", "Backup passkey");
+      if (name === null) {
+        button.disabled = false;
+        return;
+      }
+      try {
+        var response = await fetch("/auth/register/options", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ _csrf: csrf }),
+        });
+        if (!response.ok) {
+          throw new Error("Could not start enrollment.");
+        }
+        await postplanEnroll(await response.json(), name, csrf);
+      } catch (err) {
+        button.disabled = false;
+        error.textContent = err && err.message ? err.message : "That passkey wasn’t created.";
+        error.hidden = false;
+      }
+    });
+  })();
+</script>

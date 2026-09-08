@@ -77,6 +77,8 @@ services:
       S3_ADDRESSING_STYLE: path
       TOKEN_PEPPER: ${secret:TOKEN_PEPPER}
       BOOTSTRAP_TOKEN: ${secret:BOOTSTRAP_TOKEN}
+      ADMIN_SETUP_SECRET: ${secret:ADMIN_SETUP_SECRET}
+      # ADMIN_RECOVERY_SECRET: ${secret:ADMIN_RECOVERY_SECRET}
     health:
       http: /healthz
       interval: 10s

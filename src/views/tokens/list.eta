@@ -5,6 +5,7 @@
   <p class="form-error"><%= it.error %></p>
 <% } %>
 <form class="generate-form" method="post" action="/keys">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
   <label for="name">Name</label>
   <input id="name" name="name" type="text" placeholder="API · UTC stamp" autocomplete="off" />
   <button class="btn-primary" type="submit">Generate a new API key</button>
@@ -55,6 +56,7 @@
         <td class="muted"><%= token.lastUsedLabel %></td>
         <td class="revoke-cell">
           <form method="post" action="/keys/<%= token.id %>/revoke">
+            <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
             <button class="link-button" type="submit">Revoke</button>
           </form>
         </td>

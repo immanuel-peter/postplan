@@ -15,6 +15,20 @@
       "when": 1788495787869,
       "tag": "0001_bright_cyclops",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788627397176,
+      "tag": "0002_bouncy_goblin_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788832745057,
+      "tag": "0003_powerful_mentor",
+      "breakpoints": true
     }
   ]
 }

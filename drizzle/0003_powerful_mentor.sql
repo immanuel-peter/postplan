@@ -1,0 +1,1 @@
+ALTER TABLE "admin_challenges" ADD COLUMN "secret_hash" text;

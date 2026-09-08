@@ -10,6 +10,11 @@ function optional(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
 }
 
+function optionalSecret(name: string): string | null {
+  const value = process.env[name]?.trim() ?? "";
+  return value === "" ? null : value;
+}
+
 export type AppConfig = {
   nodeEnv: string;
   port: number;
@@ -24,6 +29,8 @@ export type AppConfig = {
   tokenPepper: string;
   bootstrapToken: string;
   openapiPublic: boolean;
+  adminSetupSecret: string | null;
+  adminRecoverySecret: string | null;
 };
 
 export function loadConfig(): AppConfig {
@@ -46,5 +53,7 @@ export function loadConfig(): AppConfig {
     tokenPepper: required("TOKEN_PEPPER"),
     bootstrapToken: required("BOOTSTRAP_TOKEN"),
     openapiPublic: optional("OPENAPI_PUBLIC", "true") === "true",
+    adminSetupSecret: optionalSecret("ADMIN_SETUP_SECRET"),
+    adminRecoverySecret: optionalSecret("ADMIN_RECOVERY_SECRET"),
   };
 }

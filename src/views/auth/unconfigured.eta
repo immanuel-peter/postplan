@@ -1,0 +1,7 @@
+<% layout("../layouts/auth") %>
+<h1>Setup not configured</h1>
+<p class="lede gate-lede">No passkey is enrolled and no setup secret is configured, so this deployment cannot be unlocked yet.</p>
+<p class="note">Set <code>ADMIN_SETUP_SECRET</code> in your hosting configuration and redeploy, then return to <code>/setup</code> to enroll a passkey.</p>
+<div class="gate-foot">
+  <p class="note">Published Drafts and Assets are unaffected and stay public.</p>
+</div>

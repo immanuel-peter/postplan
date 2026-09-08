@@ -1,0 +1,22 @@
+<% layout("../layouts/auth") %>
+<p class="step">Step 1 of 2</p>
+<% if (it.mode === "recovery") { %>
+  <h1>Recover access</h1>
+  <p class="lede gate-lede">Enter the recovery secret from your hosting configuration. It authorizes one replacement enrollment and signs out every session.</p>
+<% } else { %>
+  <h1>Set up PostPlan</h1>
+  <p class="lede gate-lede">No passkey is enrolled yet, so the dashboard stays locked. Enter the setup secret from your hosting configuration to continue.</p>
+<% } %>
+<% if (it.error) { %>
+  <p class="alert-error"><%= it.error %></p>
+<% } %>
+<form method="post" action="/setup" autocomplete="off">
+  <label for="secret"><%= it.mode === "recovery" ? "Recovery secret" : "Setup secret" %></label>
+  <input class="mono" id="secret" name="secret" type="password" autocomplete="off" spellcheck="false" required />
+  <button class="btn-primary btn-compact" type="submit">Continue</button>
+</form>
+<% if (it.mode === "recovery") { %>
+  <p class="note">Set <code>ADMIN_RECOVERY_SECRET</code> in your hosting configuration. Each secret works once — rotate it to authorize another recovery.</p>
+<% } else { %>
+  <p class="note">Set <code>ADMIN_SETUP_SECRET</code> in your hosting configuration, then paste it here. Attempts are rate-limited, and the secret is posted in the form — never in the URL or the logs.</p>
+<% } %>
