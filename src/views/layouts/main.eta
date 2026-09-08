@@ -21,6 +21,17 @@
         <a href="/" class="<%= it.active === 'drafts' ? 'active' : '' %>">My drafts</a>
         <a href="/assets" class="<%= it.active === 'assets' ? 'active' : '' %>">Assets</a>
         <a href="/keys" class="<%= it.active === 'keys' ? 'active' : '' %>">API keys</a>
+        <a href="/security" class="<%= it.active === 'security' ? 'active' : '' %>">Security</a>
+        <form class="nav-lock-form" method="post" action="/lock">
+          <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+          <button class="nav-lock" type="submit">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="4" y="10.5" width="16" height="10" rx="2.5" />
+              <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+            </svg>
+            <span>Lock</span>
+          </button>
+        </form>
       </nav>
       <%~ it.body %>
     </div>

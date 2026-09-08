@@ -32,6 +32,7 @@
   </tbody>
 </table>
 <form class="edit-form" method="post" action="/drafts/<%= it.draft.id %>">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
   <label for="title">Title</label>
   <input id="title" name="title" type="text" value="<%= it.draft.titleValue %>" />
   <label for="description">Description</label>
@@ -39,5 +40,6 @@
   <button class="btn-primary btn-compact" type="submit">Save</button>
 </form>
 <form class="delete-form" method="post" action="/drafts/<%= it.draft.id %>/delete" onsubmit="return confirm('Delete draft')">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
   <button class="link-button" type="submit">Delete draft</button>
 </form>

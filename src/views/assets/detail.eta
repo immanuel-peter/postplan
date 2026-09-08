@@ -74,5 +74,6 @@
   </tbody>
 </table>
 <form class="delete-form" method="post" action="/assets/<%= it.asset.id %>/delete" onsubmit="return confirm('Delete asset?')">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
   <button class="link-button" type="submit">Delete asset</button>
 </form>

@@ -615,3 +615,130 @@ code {
     grid-column: 1 / -1;
   }
 }
+
+/* Unlock, setup, security */
+
+.gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.gate-col {
+  width: 26rem;
+  max-width: 100%;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 2.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.gate-lede {
+  margin-bottom: 1.75rem;
+}
+
+.step {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gate-col input[type="text"],
+.gate-col input[type="password"] {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.gate-col label {
+  display: block;
+  margin: 0.9rem 0 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@keyframes pulse-fingerprint {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.btn-primary.is-waiting .fingerprint {
+  animation: pulse-fingerprint 1.4s ease-in-out infinite;
+}
+
+.alert-error {
+  margin: 0 0 1.35rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #e2c3ba;
+  border-radius: 8px;
+  background: #fdf3f0;
+  color: #8a2b1a;
+  font-size: 0.9rem;
+}
+
+.gate-foot {
+  margin-top: 2.5rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid var(--line);
+}
+
+.gate-foot .note {
+  margin: 0;
+}
+
+.nav-lock-form {
+  margin: 0 0 0 auto;
+}
+
+.nav-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.nav-lock:hover {
+  color: var(--text);
+}
+
+.revoke-all {
+  margin: 1rem 0 0;
+}

@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
+import { dashboardHostConstraint, isDashboardHostKind } from "../lib/host.js";
 import { formatStamp, shortCommit } from "../lib/time.js";
+import { hashesEqual } from "../lib/tokens.js";
 import {
   deleteDraft,
   getDraft,
@@ -73,26 +75,8 @@ const LIST_PAGE = 100;
 const DASH_ASSET_PAGE = 100;
 const DASH_ASSET_CAP = 2000;
 
-function dashboardHostConstraint(baseDomain: string): RegExp {
-  const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^(?:${escaped}|localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?$`, "i");
-}
-
 function isDashboardHost(request: FastifyRequest): boolean {
-  const kind = request.hostKind.kind;
-  switch (kind) {
-    case "apex":
-    case "local":
-      return true;
-    case "draft":
-    case "assets":
-    case "reject":
-      return false;
-    default: {
-      const _exhaustive: never = kind;
-      return _exhaustive;
-    }
-  }
+  return isDashboardHostKind(request.hostKind.kind);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -247,7 +231,7 @@ async function loadActiveDrafts(db: AppDeps["db"]): Promise<DraftRecord[]> {
 async function renderKeys(
   reply: FastifyReply,
   deps: AppDeps,
-  extra: { secret: string | null; error: string | null },
+  extra: { secret: string | null; error: string | null; csrf: string | null },
 ): Promise<unknown> {
   const tokens = await listTokens(deps.db);
   const rows: TokenRow[] = tokens.map((token) => ({
@@ -260,6 +244,7 @@ async function renderKeys(
   return reply.view("tokens/list", {
     title: "API keys",
     active: "keys",
+    csrf: extra.csrf,
     tokens: rows,
     secret: extra.secret,
     error: extra.error,
@@ -277,6 +262,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return reply.view("drafts/list", {
       title: "My drafts",
       active: "drafts",
+      csrf: request.adminCsrf,
       groups: groupDrafts(drafts, deps.urls),
     });
   });
@@ -296,6 +282,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return reply.view("drafts/detail", {
       title: draftTitle(draft.title),
       active: "drafts",
+      csrf: request.adminCsrf,
       draft: {
         id: draft.id,
         title: draftTitle(draft.title),
@@ -340,7 +327,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     if (!isDashboardHost(request)) {
       return;
     }
-    return renderKeys(reply, deps, { secret: null, error: null });
+    return renderKeys(reply, deps, { secret: null, error: null, csrf: request.adminCsrf });
   });
 
   app.post("/keys", dashboardOnly, async (request, reply) => {
@@ -353,7 +340,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       pepper: deps.config.tokenPepper,
       name,
     });
-    return renderKeys(reply, deps, { secret: created.secret, error: null });
+    return renderKeys(reply, deps, { secret: created.secret, error: null, csrf: request.adminCsrf });
   });
 
   app.post<{ Params: IdParams }>("/keys/:id/revoke", dashboardOnly, async (request, reply) => {
@@ -410,6 +397,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return reply.view("assets/list", {
       title: "Assets",
       active: "assets",
+      csrf: request.adminCsrf,
       items,
       summary: `${String(items.length)} file(s) · ${formatBytes(totalBytes)}`,
     });
@@ -423,11 +411,15 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         return;
       }
       let uploads: { bytes: Buffer; filename: string; contentType: string }[];
+      let suppliedCsrf: string | null = null;
       try {
         uploads = [];
         const parts = request.parts();
         for await (const part of parts) {
           if (part.type !== "file") {
+            if (part.fieldname === "_csrf" && typeof part.value === "string") {
+              suppliedCsrf = part.value;
+            }
             continue;
           }
           if (part.fieldname !== "file") {
@@ -446,6 +438,13 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         }
       } catch {
         return reply.code(413).type("text/plain").send("file exceeds 100 MiB");
+      }
+      if (
+        request.adminCsrf === null ||
+        suppliedCsrf === null ||
+        !hashesEqual(suppliedCsrf, request.adminCsrf)
+      ) {
+        return reply.code(403).type("text/plain").send("bad csrf");
       }
       if (uploads.length === 0) {
         return reply.code(400).type("text/plain").send("file is required");
@@ -483,6 +482,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return reply.view("assets/detail", {
       title: filename,
       active: "assets",
+      csrf: request.adminCsrf,
       asset: {
         id: asset.id,
         filename,

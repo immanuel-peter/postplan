@@ -1,0 +1,48 @@
+<% layout("../layouts/auth") %>
+<p class="step">Step 2 of 2</p>
+<h1>Add your passkey</h1>
+<p class="lede gate-lede">Name this device, then verify with Touch ID. That passkey becomes the only way in.</p>
+<p class="alert-error" id="enroll-error" hidden></p>
+<label for="device">Device name</label>
+<input id="device" type="text" value="MacBook Pro" autocomplete="off" />
+<button class="btn-primary btn-icon" type="button" id="enroll">
+  <svg class="fingerprint" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 11v2.5a9 9 0 0 1-.9 4" />
+    <path d="M8.5 20.2A12 12 0 0 0 10 14v-3a2 2 0 0 1 4 0v3a15 15 0 0 0 .6 4.3" />
+    <path d="M17 18.5A18 18 0 0 1 16.4 14v-3a4.4 4.4 0 0 0-8.8 0v3a8.8 8.8 0 0 1-1.3 4.6" />
+    <path d="M4.5 15.5A9 9 0 0 0 5 11a7 7 0 0 1 3.2-5.9" />
+    <path d="M19.5 14.5A10 10 0 0 1 19.3 11 7 7 0 0 0 11 4.1" />
+  </svg>
+  <span id="enroll-label">Create passkey</span>
+</button>
+<% if (it.mode === "recovery") { %>
+  <p class="note">This replaces every existing passkey and signs out every session.</p>
+<% } else { %>
+  <p class="note">Once this succeeds, setup closes for good and <code>ADMIN_SETUP_SECRET</code> can be removed. Add a second passkey afterwards on the Security page, so a lost device doesn’t lock you out.</p>
+<% } %>
+<script id="pk-options" type="application/json"><%~ it.options %></script>
+<script src="/static/webauthn.js"></script>
+<script>
+  (function () {
+    var button = document.getElementById("enroll");
+    var label = document.getElementById("enroll-label");
+    var error = document.getElementById("enroll-error");
+    var name = document.getElementById("device");
+    var options = JSON.parse(document.getElementById("pk-options").textContent);
+
+    button.addEventListener("click", function () {
+      error.hidden = true;
+      button.classList.add("is-waiting");
+      button.disabled = true;
+      label.textContent = "Waiting for your passkey…";
+
+      postplanEnroll(options, name.value, null).catch(function (err) {
+        button.classList.remove("is-waiting");
+        button.disabled = false;
+        label.textContent = "Try again";
+        error.textContent = err && err.message ? err.message : "That passkey wasn’t created.";
+        error.hidden = false;
+      });
+    });
+  })();
+</script>

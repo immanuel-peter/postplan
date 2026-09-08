@@ -76,3 +76,24 @@ export function assetOrigin(input: { baseDomain: string; port: number; nodeEnv: 
   }
   return `https://assets.${input.baseDomain}`;
 }
+
+export function dashboardHostConstraint(baseDomain: string): RegExp {
+  const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^(?:${escaped}|localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?$`, "i");
+}
+
+export function isDashboardHostKind(kind: HostKind["kind"]): boolean {
+  switch (kind) {
+    case "apex":
+    case "local":
+      return true;
+    case "draft":
+    case "assets":
+    case "reject":
+      return false;
+    default: {
+      const _exhaustive: never = kind;
+      return _exhaustive;
+    }
+  }
+}

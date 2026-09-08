@@ -32,7 +32,7 @@ async function main() {
       port: config.port,
       nodeEnv: config.nodeEnv,
     }),
-    migrationVersion: "0001_bright_cyclops",
+    migrationVersion: "0002_bouncy_goblin_queen",
   });
 
   const close = async () => {

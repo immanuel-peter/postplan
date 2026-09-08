@@ -75,6 +75,8 @@ services:
       TOKEN_PEPPER: ${TOKEN_PEPPER:-local-dev-pepper-do-not-use-in-prod}
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-pp_local_dev_bootstrap}
       OPENAPI_PUBLIC: "true"
+      ADMIN_SETUP_SECRET: ${ADMIN_SETUP_SECRET:-local-dev-setup-secret}
+      ADMIN_RECOVERY_SECRET: ${ADMIN_RECOVERY_SECRET:-}
     healthcheck:
       test:
         [
