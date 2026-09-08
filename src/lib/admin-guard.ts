@@ -5,6 +5,13 @@ import { isDashboardHostKind } from "./host.js";
 import { hashToken, hashesEqual } from "./tokens.js";
 import { authenticateSession, setupState } from "../services/admin.js";
 
+/**
+ * Routes that consume a multipart body and therefore check `_csrf` themselves, because Fastify
+ * cannot parse the body before the handler runs. Anything not listed here is rejected when sent as
+ * multipart, so a new multipart route fails closed until it does its own check.
+ */
+const MULTIPART_CSRF_ROUTES = new Set(["/assets"]);
+
 const OPEN_PATHS = new Set([
   "/healthz",
   "/readyz",
@@ -125,6 +132,11 @@ export function registerAdminGuard(app: FastifyInstance, deps: AppDeps): void {
       return;
     }
     if (request.isMultipart()) {
+      // The content type is attacker-controlled, so this must key off the route, not the request:
+      // otherwise any dashboard mutation could skip CSRF just by claiming to be multipart.
+      if (!MULTIPART_CSRF_ROUTES.has(path)) {
+        return reply.code(403).type("text/plain").send("bad csrf");
+      }
       return;
     }
     const supplied = bodyCsrf(request.body);
