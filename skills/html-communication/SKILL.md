@@ -33,11 +33,17 @@ curl -sS -H "Authorization: Bearer $POSTPLAN_TOKEN" \
 
 Pass `?cursor=` from `nextCursor` until the match is found or the list ends.
 
-A bare link gets a brief read-back of the Draft, then wait for instruction. A link plus a change ("update this") resolves the target, edits the file, and publishes a new Version through steps 2–3.
+A bare link gets a brief read-back of the Draft, then wait for instruction. A link plus a change ("update this") resolves the target, edits the file, and publishes a new Version through steps 2–4.
 
 Done when the target is **create** plus a title, or a Draft `id` plus `currentVersion`.
 
-## 2. Write the file
+## 2. Upload assets
+
+If the page needs an image, video, or similar file for ingress and render, use the `asset-upload` skill. Put the returned Asset URL in the HTML. Skip this step when the page has none.
+
+Done when every needed Asset has a public URL, or there are none.
+
+## 3. Write the file
 
 Write one UTF-8 HTML file. Self-contained means it is a complete document and it runs under the Draft CSP:
 
@@ -47,7 +53,7 @@ default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-s
 
 So: CSS in `<style>`, JS in `<script>`, images and media via Asset URLs (`https://assets.<domain>/<id>.<ext>` after the asset-upload skill) or `data:`/`blob:`/`self`, `font-family` a system stack, `fetch()` to any origin allowed. Also: complete document (`<!doctype html>`, `<html>`, `<body>`), size ≤ 5 MiB. These rules bind the page, the top-level document, even when another skill is also loaded.
 
-Design: curl the frontend-design skill and apply it to the page:
+Design: apply the frontend-design skill. If it exists on the machine, use that copy. Otherwise curl it:
 
 ```bash
 curl -sS https://raw.githubusercontent.com/anthropics/claude-code/refs/heads/main/plugins/frontend-design/skills/frontend-design/SKILL.md
@@ -63,7 +69,7 @@ Reports additionally:
 
 Done when every rule holds and the file is on disk.
 
-## 3. Publish
+## 4. Publish
 
 Create, with title ≤ 25 chars and description ≤ 80 chars:
 
@@ -88,8 +94,8 @@ curl -sS -X POST "$POSTPLAN_URL/api/v1/drafts/$DRAFT_ID/versions" \
 
 Done when the response is 201 and includes `versionUrl`.
 
-## 4. Hand back the Version URL
+## 5. Hand back the public URL
 
-Reply with `versionUrl` (the Version just published). `publicUrl` is the latest URL.
+Reply with `publicUrl` (the latest Version). Note which Version number the Draft is now at if useful. Do not lead with `versionUrl`.
 
-Done when the user has `versionUrl`.
+Done when the user has `publicUrl`.
