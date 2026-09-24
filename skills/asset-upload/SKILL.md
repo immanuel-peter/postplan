@@ -32,10 +32,22 @@ Done when a file is on disk, non-empty, ≤ 100 MiB.
 ```bash
 curl -sS -X POST "$POSTPLAN_URL/api/v1/assets" \
   -H "Authorization: Bearer $POSTPLAN_TOKEN" \
-  -F "file=@photo.png"
+  -F "file=@photo.png" \
+  -F "description=Golden retriever puppy in tall grass at sunset"
 ```
 
-Done when the response is 201 and includes `url` (`https://assets.<domain>/<id>.<ext>`). Record `id`, `url`, `contentType`, `byteSize`, `sha256`.
+`description` is optional. Short, concrete, ≤ ~125 chars. What a screen reader should say. Never the filename. Absent field → null.
+
+Done when the response is 201 and includes `url` (`https://assets.<domain>/<id>.<ext>`). Record `id`, `url`, `contentType`, `byteSize`, `sha256`, `description`.
+
+Can also PATCH later:
+
+```bash
+curl -sS -X PATCH "$POSTPLAN_URL/api/v1/assets/$ASSET_ID" \
+  -H "Authorization: Bearer $POSTPLAN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"description":"Short alt-text, ≤ ~125 chars"}'
+```
 
 List / inspect when needed:
 
@@ -64,14 +76,16 @@ Done when bytes match and headers hold.
 
 ## 4. Hand back the URL
 
-Reply with the `url` plus the snippet matching the use:
+Reply with the `url` plus the snippet matching the use. Use `description` from the 201/GET response as alt when set; otherwise the filename base (`photo`).
 
 ```
-Direct:   https://assets.postplan.link/<id>.png
-Markdown: ![photo](https://assets.postplan.link/<id>.png)
-HTML:     <img src="https://assets.postplan.link/<id>.png" alt="photo">
-curl:     curl -O https://assets.postplan.link/<id>.png
+Direct:   https://assets.postplan.domain/<id>.png
+Markdown: ![Golden retriever puppy in tall grass at sunset](https://assets.postplan.domain/<id>.png)
+HTML:     <img src="https://assets.postplan.domain/<id>.png" alt="Golden retriever puppy in tall grass at sunset">
+curl:     curl -O https://assets.postplan.domain/<id>.png
 ```
+
+No description: `![photo](...)` / `alt="photo"`.
 
 Drafts can `<img>` or `<video>` the URL. External apps can too (CORS `*`).
 

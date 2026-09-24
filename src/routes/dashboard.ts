@@ -19,6 +19,8 @@ import {
   getAsset,
   listAssets,
   MAX_ASSET_BYTES,
+  normalizeAssetDescription,
+  patchAsset,
 } from "../services/assets.js";
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftRecord, VersionRecord } from "../services/types.js";
@@ -64,6 +66,7 @@ type TokenRow = {
 type AssetItemRow = {
   id: string;
   filename: string;
+  description: string | null;
   detailUrl: string;
   thumbUrl: string;
   sizeLabel: string;
@@ -207,6 +210,10 @@ function assetExtLabel(filename: string): string {
 function assetDisplayName(filename: string | null | undefined): string {
   const trimmed = filename?.trim() ?? "";
   return trimmed === "" ? "unnamed" : trimmed;
+}
+
+function escapeAttr(value: string): string {
+  return value.replaceAll('"', "&quot;");
 }
 
 async function loadActiveDrafts(db: AppDeps["db"]): Promise<DraftRecord[]> {
@@ -379,6 +386,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         items.push({
           id: asset.id,
           filename,
+          description: asset.description,
           detailUrl: `/assets/${asset.id}`,
           thumbUrl: deps.assetUrls.publicUrl(asset.id, asset.filename),
           sizeLabel: formatBytes(asset.byteSize),
@@ -478,6 +486,8 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     const filename = assetDisplayName(asset.filename);
     const dot = filename.lastIndexOf(".");
     const base = dot > 0 ? filename.slice(0, dot) : filename;
+    const description = asset.description?.trim() || "";
+    const altSource = description || base;
     const previewUrl = deps.assetUrls.publicUrl(asset.id, asset.filename);
     return reply.view("assets/detail", {
       title: filename,
@@ -486,6 +496,9 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       asset: {
         id: asset.id,
         filename,
+        description,
+        descriptionValue: description,
+        altSource,
         previewUrl,
         kind: assetKindFromContentType(asset.contentType),
         contentType: asset.contentType,
@@ -496,11 +509,30 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       },
       snippets: {
         direct: previewUrl,
-        markdown: `![${base}](${previewUrl})`,
-        html: `<img src="${previewUrl}" alt="${base}">`,
+        markdown: `![${altSource}](${previewUrl})`,
+        html: `<img src="${previewUrl}" alt="${escapeAttr(altSource)}">`,
         curl: `curl -O ${previewUrl}`,
       },
     });
+  });
+
+  app.post<{ Params: IdParams }>("/assets/:id", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    const description = normalizeAssetDescription(readField(request.body, "description"));
+    if (isServiceError(description)) {
+      return reply.code(400).type("text/plain").send(description.detail);
+    }
+    const updated = await patchAsset({
+      db: deps.db,
+      id: request.params.id,
+      description: description ?? null,
+    });
+    if (isServiceError(updated)) {
+      return reply.code(404).type("text/plain").send("not found");
+    }
+    return reply.redirect(`/assets/${updated.id}`);
   });
 
   app.post<{ Params: IdParams }>("/assets/:id/delete", dashboardOnly, async (request, reply) => {

@@ -89,6 +89,7 @@ export const assets = pgTable(
     sha256: text("sha256").notNull(),
     objectKey: text("object_key").notNull().unique(),
     filename: text("filename"),
+    description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("assets_created_at_idx").on(t.createdAt)],

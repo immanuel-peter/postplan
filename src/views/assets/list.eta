@@ -1,6 +1,6 @@
 <% layout("../layouts/main") %>
 <h1>Assets</h1>
-<p class="lede">Immutable files with a stable public URL. Upload here or with <code>curl -F "file=@photo.png"</code>.</p>
+<p class="lede">Upload here or with <code>curl -F "file=@photo.png" -F "description=…"</code>.</p>
 <div class="dropzone" id="dropzone">
   <svg class="dropzone-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M12 16V4" />
@@ -66,7 +66,7 @@
 <% } else { %>
   <div class="assets-grid">
     <% for (const item of it.items) { %>
-      <article class="asset-card">
+      <article class="asset-card"<% if (item.description) { %> title="<%= item.description %>"<% } %>>
         <a class="asset-thumb" href="<%= item.detailUrl %>">
           <% if (item.kind === "image") { %>
             <img src="<%= item.thumbUrl %>" alt="<%= item.filename %>" loading="lazy" />
