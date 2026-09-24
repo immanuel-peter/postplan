@@ -1,12 +1,15 @@
 <% layout("../layouts/main") %>
 <a class="back" href="/assets">← Assets</a>
 <h1><%= it.asset.filename %></h1>
+<% if (it.asset.description) { %>
+  <p class="lede"><%= it.asset.description %></p>
+<% } %>
 <p class="public-url-row">
   <a class="public-url" href="<%= it.asset.previewUrl %>" target="_blank" rel="noreferrer"><%= it.asset.previewUrl %></a>
 </p>
 <div class="preview-card">
   <% if (it.asset.kind === "image") { %>
-    <img src="<%= it.asset.previewUrl %>" alt="<%= it.asset.filename %>" />
+    <img src="<%= it.asset.previewUrl %>" alt="<%= it.asset.altSource %>" />
   <% } else if (it.asset.kind === "video") { %>
     <video src="<%= it.asset.previewUrl %>" controls preload="metadata"></video>
   <% } else if (it.asset.kind === "audio") { %>
@@ -73,6 +76,12 @@
     </tr>
   </tbody>
 </table>
+<form class="edit-form" method="post" action="/assets/<%= it.asset.id %>">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+  <label for="description">Description</label>
+  <textarea id="description" name="description" rows="3" maxlength="2000"><%= it.asset.descriptionValue %></textarea>
+  <button class="btn-primary btn-compact" type="submit">Save</button>
+</form>
 <form class="delete-form" method="post" action="/assets/<%= it.asset.id %>/delete" onsubmit="return confirm('Delete asset?')">
   <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
   <button class="link-button" type="submit">Delete asset</button>

@@ -12,6 +12,8 @@ import {
   getAsset,
   listAssets,
   MAX_ASSET_BYTES,
+  normalizeAssetDescription,
+  patchAsset,
   toAssetResponse,
 } from "../services/assets.js";
 import {
@@ -145,7 +147,7 @@ const createdTokenSchema = {
 const assetResponseSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "url", "contentType", "byteSize", "sha256", "filename", "createdAt"],
+  required: ["id", "url", "contentType", "byteSize", "sha256", "filename", "description", "createdAt"],
   properties: {
     id: { type: "string" },
     url: { type: "string" },
@@ -153,6 +155,7 @@ const assetResponseSchema = {
     byteSize: { type: "integer" },
     sha256: { type: "string" },
     filename: { type: ["string", "null"] },
+    description: { type: ["string", "null"] },
     createdAt: { type: "string" },
   },
 };
@@ -901,6 +904,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
             type: "object",
             properties: {
               file: { type: "string", format: "binary" },
+              description: { type: "string" },
             },
           },
           response: {
@@ -938,6 +942,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           return sendProblem(reply, problem(400, "Bad Request", "file is required"));
         }
 
+        const description = normalizeAssetDescription(upload.fields.description);
+        if (isServiceError(description)) {
+          return sendServiceError(reply, description);
+        }
+
         const created = await createAsset({
           db: deps.db,
           s3: deps.s3,
@@ -946,6 +955,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           bytes: file.bytes,
           filename: file.filename,
           contentType: contentTypeForUpload(file.mimetype || undefined, file.filename),
+          ...(description === undefined ? {} : { description }),
         });
         if (isServiceError(created)) {
           return sendServiceError(reply, created);
@@ -1041,6 +1051,59 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           return sendServiceError(reply, record);
         }
         return toAssetResponse(record, deps.assetUrls);
+      },
+    );
+
+    api.patch<{ Params: { id: string } }>(
+      "/assets/:id",
+      {
+        schema: {
+          tags: ["assets"],
+          summary: "Update Asset metadata",
+          security,
+          params: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+          },
+          body: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              description: { type: ["string", "null"] },
+            },
+          },
+          response: {
+            200: assetResponseSchema,
+            ...errorResponses,
+          },
+        },
+      },
+      async (request, reply) => {
+        const token = await requireToken(request, reply, deps, "drafts:write");
+        if (!token) {
+          return;
+        }
+
+        const body = request.body === undefined ? {} : request.body;
+        if (!isPlainObject(body)) {
+          return sendProblem(reply, problem(400, "Bad Request", "JSON object required"));
+        }
+
+        const description = normalizeAssetDescription("description" in body ? body.description : undefined);
+        if (isServiceError(description)) {
+          return sendServiceError(reply, description);
+        }
+
+        const patched = await patchAsset({
+          db: deps.db,
+          id: request.params.id,
+          ...(description === undefined ? {} : { description }),
+        });
+        if (isServiceError(patched)) {
+          return sendServiceError(reply, patched);
+        }
+        return toAssetResponse(patched, deps.assetUrls);
       },
     );
 

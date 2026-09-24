@@ -10,6 +10,7 @@ import { recordOrphan } from "./orphans.js";
 import type { ServiceError } from "./types.js";
 
 export const MAX_ASSET_BYTES = 100 * 1024 * 1024;
+export const MAX_ASSET_DESCRIPTION = 2000;
 
 export type AssetRecord = {
   id: string;
@@ -18,6 +19,7 @@ export type AssetRecord = {
   sha256: string;
   objectKey: string;
   filename: string | null;
+  description: string | null;
   createdAt: Date;
 };
 
@@ -28,6 +30,7 @@ export type AssetResponse = {
   byteSize: number;
   sha256: string;
   filename: string | null;
+  description: string | null;
   createdAt: string;
 };
 
@@ -154,6 +157,7 @@ function asAsset(row: typeof assets.$inferSelect): AssetRecord {
     sha256: row.sha256,
     objectKey: row.objectKey,
     filename: row.filename,
+    description: row.description,
     createdAt: row.createdAt,
   };
 }
@@ -166,8 +170,39 @@ export function toAssetResponse(record: AssetRecord, urls: AssetUrls): AssetResp
     byteSize: record.byteSize,
     sha256: record.sha256,
     filename: record.filename,
+    description: record.description,
     createdAt: record.createdAt.toISOString(),
   };
+}
+
+export function normalizeAssetDescription(
+  value: unknown,
+): string | null | undefined | ServiceError {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return {
+      kind: "validation",
+      title: "Invalid asset",
+      detail: "description must be a string or null",
+    };
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  if (trimmed.length > MAX_ASSET_DESCRIPTION) {
+    return {
+      kind: "validation",
+      title: "Invalid asset",
+      detail: "description exceeds 2000 characters",
+    };
+  }
+  return trimmed;
 }
 
 export async function createAsset(input: {
@@ -178,6 +213,7 @@ export async function createAsset(input: {
   bytes: Buffer;
   filename: string | null;
   contentType: string;
+  description?: string | null;
 }): Promise<AssetRecord | ServiceError> {
   if (input.bytes.byteLength === 0) {
     return { kind: "validation", title: "Invalid asset", detail: "asset file is empty" };
@@ -214,6 +250,7 @@ export async function createAsset(input: {
     sha256: sha256Hex(input.bytes),
     objectKey,
     filename: input.filename,
+    description: input.description ?? null,
     createdAt: now,
   };
 
@@ -225,6 +262,7 @@ export async function createAsset(input: {
       sha256: record.sha256,
       objectKey,
       filename: input.filename,
+      description: input.description ?? null,
       createdAt: now,
     });
   } catch (error) {
@@ -272,6 +310,28 @@ export async function listAssets(input: {
     items: page.map(asAsset),
     nextCursor: extra ? (page[page.length - 1]?.createdAt.toISOString() ?? null) : null,
   };
+}
+
+export async function patchAsset(input: {
+  db: Database;
+  id: string;
+  description?: string | null;
+}): Promise<AssetRecord | ServiceError> {
+  const existing = await getAsset(input.db, input.id);
+  if ("kind" in existing) {
+    return existing;
+  }
+  const [updated] = await input.db
+    .update(assets)
+    .set({
+      description: input.description === undefined ? existing.description : input.description,
+    })
+    .where(eq(assets.id, input.id))
+    .returning();
+  if (!updated) {
+    return { kind: "not_found", title: "Not found", detail: "asset not found" };
+  }
+  return asAsset(updated);
 }
 
 export async function deleteAsset(input: {
