@@ -52,6 +52,17 @@ Send a `POST` request to `/api/v1/drafts/{id}/versions` to append a new version:
 - Supply the `If-Match: "{version_number}"` header to confirm the target version.
 - The server stores the new version as `version_number + 1`.
 
+## Tests
+
+Tests use Node's built-in runner through `tsx` and drive the real app with Fastify's `inject()`, so they need no browser or open port. S3 is an in-memory fake (`test/helpers/fake-s3.ts`).
+
+```bash
+npm test                     # unit tests; Postgres-backed suites are skipped
+TEST_DATABASE_URL=postgres://postplan:postplan-local-dev@localhost:5432/postplan npm test
+```
+
+With `TEST_DATABASE_URL` set, each integration test file creates, migrates, and drops its own throwaway database, so the role needs `CREATEDB`. CI runs typecheck, build, and the full suite against a Postgres service container.
+
 ## Deployment
 
 Deploy the project stack on Hostess with `hostess.yml`.
