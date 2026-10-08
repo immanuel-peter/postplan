@@ -42,6 +42,7 @@ import {
   setupState,
   type ChallengeOperation,
 } from "../services/admin.js";
+import { readField } from "../lib/request.js";
 
 /** One admin identity: a fixed WebAuthn user handle, no owner table (ADR 0008). */
 const ADMIN_USER_ID = new TextEncoder().encode("postplan-admin");
@@ -51,22 +52,6 @@ type IdParams = { id: string };
 
 const setupLimiter = createRateLimiter({ limit: 10, windowMs: 15 * 60 * 1000 });
 const unlockLimiter = createRateLimiter({ limit: 30, windowMs: 15 * 60 * 1000 });
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readField(body: unknown, key: string): string | null {
-  if (!isRecord(body)) {
-    return null;
-  }
-  const value = body[key];
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
-}
 
 export function csrfToken(sessionId: string, pepper: string): string {
   return hashToken(`csrf:${sessionId}`, pepper);

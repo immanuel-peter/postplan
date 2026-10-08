@@ -5,6 +5,7 @@ import { getObjectStream } from "../lib/s3.js";
 import type { AssetRecord } from "../services/assets.js";
 import { getAsset, parseAssetPath } from "../services/assets.js";
 import { isServiceError } from "../services/types.js";
+import { matchesEtag } from "../lib/request.js";
 
 type AssetParams = {
   id: string;
@@ -13,20 +14,6 @@ type AssetParams = {
 function assetsHostConstraint(baseDomain: string): RegExp {
   const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^assets\\.${escaped}(?::\\d+)?$`, "i");
-}
-
-function matchesEtag(ifNoneMatch: string | string[] | undefined, etag: string): boolean {
-  if (ifNoneMatch === undefined) {
-    return false;
-  }
-  const header = Array.isArray(ifNoneMatch) ? ifNoneMatch.join(",") : ifNoneMatch;
-  for (const token of header.split(",")) {
-    const candidate = token.trim();
-    if (candidate === "*" || candidate === etag) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function encodeRfc5987(value: string): string {

@@ -24,6 +24,7 @@ import {
   getIdempotentResult,
   getVersion,
   latestVersion,
+  latestVersions,
   listDrafts,
   listVersions,
   patchDraft,
@@ -34,6 +35,7 @@ import {
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftResponse, DraftStatus, ServiceError, TokenRecord, VersionRecord } from "../services/types.js";
 import { isServiceError } from "../services/types.js";
+import { isRecord, parseVersionNumber } from "../lib/request.js";
 
 const problemSchema = {
   type: "object",
@@ -188,10 +190,6 @@ const PATCH_DRAFT_KEYS: (keyof PatchDraftFields)[] = [
   "gitCommit",
 ];
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function headerValue(request: FastifyRequest, name: string): string | undefined {
   const value = request.headers[name];
   if (typeof value === "string") {
@@ -209,7 +207,7 @@ function headerValue(request: FastifyRequest, name: string): string | undefined 
 }
 
 function queryField(query: unknown, key: string): string | undefined {
-  if (!isPlainObject(query)) {
+  if (!isRecord(query)) {
     return undefined;
   }
   const value = query[key];
@@ -240,15 +238,8 @@ function parseListLimit(raw: string | undefined): { ok: true; limit: number } | 
   return { ok: true, limit: Math.min(n, 100) };
 }
 
-function parseVersionNumber(raw: string): number | null {
-  if (!/^[1-9]\d*$/.test(raw)) {
-    return null;
-  }
-  return Number.parseInt(raw, 10);
-}
-
 function parsePatchDraftBody(body: unknown): { ok: true; fields: PatchDraftFields } | { ok: false; detail: string } {
-  if (!isPlainObject(body)) {
+  if (!isRecord(body)) {
     return { ok: false, detail: "JSON object required" };
   }
   const fields: PatchDraftFields = {};
@@ -268,7 +259,7 @@ function parsePatchDraftBody(body: unknown): { ok: true; fields: PatchDraftField
 function parseCreateTokenBody(
   body: unknown,
 ): { ok: true; name: string; expiresAt?: Date | null } | { ok: false; detail: string } {
-  if (!isPlainObject(body)) {
+  if (!isRecord(body)) {
     return { ok: false, detail: "JSON object required" };
   }
   const name = body.name;
@@ -546,9 +537,13 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           ...(cursor !== undefined ? { cursor } : {}),
         });
 
+        const versions = await latestVersions(
+          deps.db,
+          listed.items.map((draft) => draft.id),
+        );
         const items: DraftResponse[] = [];
         for (const draft of listed.items) {
-          const version = await latestVersion(deps.db, draft.id);
+          const version = versions.get(draft.id);
           if (!version) {
             continue;
           }
@@ -1086,7 +1081,7 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
         }
 
         const body = request.body === undefined ? {} : request.body;
-        if (!isPlainObject(body)) {
+        if (!isRecord(body)) {
           return sendProblem(reply, problem(400, "Bad Request", "JSON object required"));
         }
 

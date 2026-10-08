@@ -13,6 +13,7 @@ import {
 import { assetOrigin } from "../lib/host.js";
 import { getHtml } from "../lib/s3.js";
 import { getVersionForPublic } from "../services/drafts.js";
+import { matchesEtag, parseVersionNumber } from "../lib/request.js";
 
 const HTML_TYPE = "text/html; charset=utf-8";
 
@@ -42,31 +43,6 @@ function draftSlug(hostKind: FastifyRequest["hostKind"]): string | null {
       return _exhaustive;
     }
   }
-}
-
-function parseVersionParam(raw: string): number | null {
-  if (!/^[1-9][0-9]*$/.test(raw)) {
-    return null;
-  }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isSafeInteger(n)) {
-    return null;
-  }
-  return n;
-}
-
-function matchesEtag(ifNoneMatch: string | string[] | undefined, etag: string): boolean {
-  if (ifNoneMatch === undefined) {
-    return false;
-  }
-  const header = Array.isArray(ifNoneMatch) ? ifNoneMatch.join(",") : ifNoneMatch;
-  for (const token of header.split(",")) {
-    const candidate = token.trim();
-    if (candidate === "*" || candidate === etag) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function sendNotFound(reply: FastifyReply): FastifyReply {
@@ -177,7 +153,7 @@ export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps):
     if (slug === null) {
       return;
     }
-    const versionNumber = parseVersionParam(request.params.n);
+    const versionNumber = parseVersionNumber(request.params.n);
     if (versionNumber === null) {
       sendNotFound(reply);
       return;

@@ -25,6 +25,7 @@ import {
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftRecord, VersionRecord } from "../services/types.js";
 import { isServiceError } from "../services/types.js";
+import { readField } from "../lib/request.js";
 
 type IdParams = {
   id: string;
@@ -80,22 +81,6 @@ const DASH_ASSET_CAP = 2000;
 
 function isDashboardHost(request: FastifyRequest): boolean {
   return isDashboardHostKind(request.hostKind.kind);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readField(body: unknown, key: string): string | null {
-  if (!isRecord(body)) {
-    return null;
-  }
-  const value = body[key];
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
 }
 
 function draftTitle(title: string | null): string {
