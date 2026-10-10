@@ -154,6 +154,11 @@ export async function buildApp(deps: AppDeps) {
     return reply.type("text/javascript; charset=utf-8").send(webauthnJs);
   });
 
+  const localtimeJs = readFileSync(join(here, "public", "localtime.js"), "utf8");
+  app.get("/static/localtime.js", async (_request, reply) => {
+    return reply.type("text/javascript; charset=utf-8").send(localtimeJs);
+  });
+
   const faviconSvg = readFileSync(join(here, "public", "favicon.svg"));
   const faviconIco = readFileSync(join(here, "public", "favicon.ico"));
   const touchIcon = readFileSync(join(here, "public", "apple-touch-icon.png"));

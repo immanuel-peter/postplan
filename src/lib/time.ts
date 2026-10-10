@@ -14,6 +14,15 @@ export function formatStamp(value: Date | string | null | undefined): string {
   return `${y}-${m}-${d} ${hh}:${mm}`;
 }
 
+/** ISO 8601 instant for a `<time datetime>` attribute; "" when there is no valid date. */
+export function isoStamp(value: Date | string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  const date = typeof value === "string" ? new Date(value) : value;
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
 export function shortCommit(value: string | null | undefined): string {
   if (!value) {
     return "";

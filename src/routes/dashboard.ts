@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
 import { dashboardHostConstraint, isDashboardHostKind } from "../lib/host.js";
-import { formatStamp, shortCommit } from "../lib/time.js";
+import { formatStamp, isoStamp, shortCommit } from "../lib/time.js";
 import { hashesEqual } from "../lib/tokens.js";
 import {
   deleteDraft,
@@ -61,7 +61,9 @@ type TokenRow = {
   name: string;
   prefix: string;
   createdLabel: string;
+  createdIso: string;
   lastUsedLabel: string;
+  lastUsedIso: string;
 };
 
 type AssetItemRow = {
@@ -73,6 +75,8 @@ type AssetItemRow = {
   sizeLabel: string;
   kind: "image" | "video" | "audio" | "pdf" | "other";
   extLabel: string;
+  uploadedLabel: string;
+  uploadedIso: string;
 };
 
 const LIST_PAGE = 100;
@@ -90,6 +94,10 @@ function draftTitle(title: string | null): string {
 
 function versionCountLabel(count: number): string {
   return count === 1 ? "1 version" : `${String(count)} versions`;
+}
+
+function fileCountLabel(count: number): string {
+  return count === 1 ? "1 file" : `${String(count)} files`;
 }
 
 function refLabel(gitRef: string | null, gitCommit: string | null): string {
@@ -231,7 +239,9 @@ async function renderKeys(
     name: token.name,
     prefix: token.prefix,
     createdLabel: formatStamp(token.createdAt),
+    createdIso: isoStamp(token.createdAt),
     lastUsedLabel: formatStamp(token.lastUsedAt),
+    lastUsedIso: isoStamp(token.lastUsedAt),
   }));
   return reply.view("tokens/list", {
     title: "API keys",
@@ -377,6 +387,8 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
           sizeLabel: formatBytes(asset.byteSize),
           kind: assetKindFromContentType(asset.contentType),
           extLabel: assetExtLabel(filename),
+          uploadedLabel: formatStamp(asset.createdAt),
+          uploadedIso: isoStamp(asset.createdAt),
         });
       }
       if (items.length >= DASH_ASSET_CAP) {
@@ -392,7 +404,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       active: "assets",
       csrf: request.adminCsrf,
       items,
-      summary: `${String(items.length)} file(s) · ${formatBytes(totalBytes)}`,
+      summary: `${fileCountLabel(items.length)} · ${formatBytes(totalBytes)}`,
     });
   });
 
@@ -491,6 +503,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         sha256: asset.sha256,
         shaShort: asset.sha256.length > 20 ? `${asset.sha256.slice(0, 20)}…` : asset.sha256,
         uploadedLabel: formatStamp(asset.createdAt),
+        uploadedIso: isoStamp(asset.createdAt),
       },
       snippets: {
         direct: previewUrl,
