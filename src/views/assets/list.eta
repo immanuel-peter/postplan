@@ -1,6 +1,9 @@
 <% layout("../layouts/main") %>
 <h1>Assets</h1>
 <p class="lede">Upload here or with <code>curl -F "file=@photo.png" -F "description=…"</code>.</p>
+<% if (it.deleted) { %>
+  <p class="flash" role="status">Asset deleted.</p>
+<% } %>
 <section class="dropbar" id="dropzone" aria-label="Upload">
   <svg class="dropbar-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M12 16V4" />

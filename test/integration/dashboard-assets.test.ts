@@ -133,8 +133,87 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     const detail = await page(`/assets/${asset.id}`);
     assert.match(
       detail,
-      /<td class="muted mono"><time datetime="\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z" data-local>\d{4}-\d\d-\d\d \d\d:\d\d<\/time><\/td>/,
+      /<td class="col-time hide-xs"><time datetime="\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z" data-local>\d{4}-\d\d-\d\d \d\d:\d\d<\/time><\/td>/,
     );
     assert.match(detail, /<script src="\/static\/localtime\.js" defer><\/script>/);
+  });
+
+  it("shows the detail page with an in-place description, Reference rows, and no SHA", async () => {
+    const asset = await apiUpload("heatmap.png", "image/png", "pixels", 'Layer "4" weights');
+    const detail = await page(`/assets/${asset.id}`);
+
+    // Description: inline field (no textarea) that posts back to the asset.
+    assert.doesNotMatch(detail, /<textarea/);
+    assert.match(detail, /<form class="desc-form" id="desc-form" method="post" action="\/assets\/[^"]+">/);
+    assert.match(detail, /<span class="desc-text" id="desc-text">Layer &quot;4&quot; weights<\/span>/);
+    assert.match(detail, /<input id="description" name="description" type="text" maxlength="2000" value="Layer &quot;4&quot; weights"/);
+
+    // "Reference" replaces "Embed", without the Direct link row.
+    assert.match(detail, /<h2 id="reference-title">Reference<\/h2>/);
+    assert.doesNotMatch(detail, />Embed</);
+    assert.doesNotMatch(detail, /Direct link/);
+    for (const label of ["Markdown", "HTML", "curl"]) {
+      assert.match(detail, new RegExp(`<span class="ref-label">${label}</span>`));
+    }
+    assert.match(detail, /data-snippet="html"[^>]*>&lt;img src=&quot;[^&]+&quot; alt=&quot;Layer &amp;quot;4&amp;quot; weights&quot;&gt;<\/code>/);
+
+    // Details drop the SHA-256.
+    assert.doesNotMatch(detail, /sha-?256/i);
+    assert.match(
+      detail,
+      /<th scope="col">Type<\/th>\s*<th scope="col" class="col-size hide-xs">Size<\/th>\s*<th scope="col" class="col-time hide-xs">Uploaded<\/th>/,
+    );
+
+    // Delete is a destructive button that confirms in a dialog first.
+    assert.match(detail, /<form method="post" action="\/assets\/[^"]+\/delete" id="delete-form">/);
+    assert.match(detail, /<button class="btn btn-danger-soft" type="submit">/);
+    assert.match(detail, /<dialog class="confirm" id="delete-dialog" aria-labelledby="delete-title">/);
+    assert.match(detail, /<h2 id="delete-title">Delete “heatmap\.png”\?<\/h2>/);
+    assert.doesNotMatch(detail, /link-button/);
+  });
+
+  it("saves a description posted from the page, and deleting lands on the list with a notice", async () => {
+    const asset = await apiUpload("notes.pdf", "application/pdf", "%PDF-1.4");
+    const headers = {
+      ...apiHost(),
+      cookie: session.cookie,
+      origin: ORIGIN,
+      "content-type": "application/x-www-form-urlencoded",
+    };
+
+    const saved = await t.app.inject({
+      method: "POST",
+      url: `/assets/${asset.id}`,
+      headers,
+      payload: new URLSearchParams({ _csrf: session.csrf, description: "  Reading list  " }).toString(),
+    });
+    assert.equal(saved.statusCode, 302);
+    assert.equal(saved.headers.location, `/assets/${asset.id}`);
+    assert.match(await page(`/assets/${asset.id}`), /<span class="desc-text" id="desc-text">Reading list<\/span>/);
+
+    const cleared = await t.app.inject({
+      method: "POST",
+      url: `/assets/${asset.id}`,
+      headers,
+      payload: new URLSearchParams({ _csrf: session.csrf, description: "" }).toString(),
+    });
+    assert.equal(cleared.statusCode, 302);
+    assert.match(
+      await page(`/assets/${asset.id}`),
+      /<span class="desc-text is-empty" id="desc-text">Add a description<\/span>/,
+    );
+
+    assert.doesNotMatch(await page(), /Asset deleted\./);
+    const deleted = await t.app.inject({
+      method: "POST",
+      url: `/assets/${asset.id}/delete`,
+      headers,
+      payload: new URLSearchParams({ _csrf: session.csrf }).toString(),
+    });
+    assert.equal(deleted.statusCode, 302);
+    assert.equal(deleted.headers.location, "/assets?deleted=1");
+    const list = await page("/assets?deleted=1");
+    assert.match(list, /<p class="flash" role="status">Asset deleted\.<\/p>/);
+    assert.doesNotMatch(list, /notes\.pdf/);
   });
 });

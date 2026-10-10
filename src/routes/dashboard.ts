@@ -425,7 +425,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return reply.redirect("/keys");
   });
 
-  app.get("/assets", dashboardOnly, async (request, reply) => {
+  app.get<{ Querystring: { deleted?: unknown } }>("/assets", dashboardOnly, async (request, reply) => {
     if (!isDashboardHost(request)) {
       return;
     }
@@ -474,6 +474,8 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       csrf: request.adminCsrf,
       items,
       summary: `${fileCountLabel(items.length)} · ${formatBytes(totalBytes)}`,
+      // Set by the delete redirect so the list can confirm what just happened.
+      deleted: request.query.deleted === "1",
     });
   });
 
@@ -569,13 +571,11 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         kind: assetKindFromContentType(asset.contentType),
         contentType: asset.contentType,
         sizeLabel: formatBytes(asset.byteSize),
-        sha256: asset.sha256,
-        shaShort: asset.sha256.length > 20 ? `${asset.sha256.slice(0, 20)}…` : asset.sha256,
+        altFallback: base,
         uploadedLabel: formatStamp(asset.createdAt),
         uploadedIso: isoStamp(asset.createdAt),
       },
       snippets: {
-        direct: previewUrl,
         markdown: `![${altSource}](${previewUrl})`,
         html: `<img src="${previewUrl}" alt="${escapeAttr(altSource)}">`,
         curl: `curl -O ${previewUrl}`,
@@ -615,6 +615,6 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     if (isServiceError(deleted)) {
       return reply.code(404).type("text/plain").send("not found");
     }
-    return reply.redirect("/assets");
+    return reply.redirect("/assets?deleted=1");
   });
 }

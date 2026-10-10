@@ -1104,18 +1104,24 @@ code {
   border-bottom: 9px solid transparent;
 }
 
+/* Asset detail: the preview stage */
+
 .preview-card {
-  padding: 1.5rem;
+  margin-top: 1.5rem;
+  padding: 2rem 1.5rem;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: var(--surface);
+  background: var(--surface-tint);
   text-align: center;
 }
 
 .preview-card img {
   max-width: 100%;
-  max-height: 60vh;
-  border-radius: 8px;
+  max-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  vertical-align: middle;
 }
 
 .preview-card video {
@@ -1139,50 +1145,6 @@ code {
 .asset-thumb--icon-lg {
   min-height: 240px;
   border-radius: 8px;
-}
-
-.embed-rows {
-  margin: 1rem 0 0;
-  border-top: 1px solid var(--line);
-}
-
-.embed-row {
-  display: grid;
-  grid-template-columns: 120px 1fr auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.embed-label {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.embed-value {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.8rem;
-  word-break: break-all;
-}
-
-.copy-btn {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-  .embed-row {
-    grid-template-columns: 1fr auto;
-  }
-
-  .embed-label {
-    grid-column: 1 / -1;
-  }
 }
 
 /* Unlock, setup, security */
@@ -1350,6 +1312,251 @@ code {
 /* .assets-table .col-size sets the cell font size; keep the header at the table-header size. */
 .assets-table th.col-size {
   font-size: 11px;
+}
+
+/* Asset detail: header, in-place description, link, Reference rows, Details. */
+
+.asset-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.page-actions form {
+  margin: 0;
+}
+
+.desc-form {
+  min-height: 2.25rem;
+  margin: 0.35rem 0 0;
+}
+
+/* Without JS the description is a plain field with a Save button; the script switches to inline. */
+.desc-display {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin-left: -0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #4a4a4a;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.desc-display:hover {
+  background: var(--hover-bg);
+}
+
+.desc-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.desc-text.is-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.desc-pencil {
+  flex: 0 0 auto;
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.desc-display:hover .desc-pencil,
+.desc-display:focus-visible .desc-pencil {
+  opacity: 1;
+}
+
+.desc-editor {
+  max-width: 40rem;
+}
+
+.desc-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.desc-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: -0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.desc-row input:focus {
+  border-color: var(--link);
+  box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.15);
+  outline: none;
+}
+
+.desc-help {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.desc-help span:last-child {
+  font-variant-numeric: tabular-nums;
+}
+
+.desc-form.is-inline .desc-display {
+  display: inline-flex;
+}
+
+.desc-form.is-inline .desc-editor,
+.desc-form.is-inline .desc-save {
+  display: none;
+}
+
+.desc-form.is-inline.is-editing .desc-display {
+  display: none;
+}
+
+.desc-form.is-inline.is-editing .desc-editor {
+  display: block;
+}
+
+.desc-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.desc-status[hidden] {
+  display: none;
+}
+
+.desc-status.is-saved {
+  color: #2f6b2f;
+}
+
+.desc-status.is-error {
+  color: #8a2b1a;
+}
+
+.desc-status.is-error .desc-status-check {
+  display: none;
+}
+
+.url-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0.6rem 0 0;
+}
+
+.url-row .public-url {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.icon-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  height: 32px;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--segment-bg);
+  color: var(--text);
+}
+
+.panel-head + .ref-row {
+  border-top: 1px solid var(--line);
+}
+
+.ref-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 1.25rem;
+  border-top: 1px solid var(--row-line);
+}
+
+.ref-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ref-value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .ref-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.25rem;
+  }
+
+  .ref-label {
+    grid-column: 1 / -1;
+  }
+}
+
+.details-table td .mono {
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.details-table .col-size {
+  width: 140px;
+  font-size: 0.9rem;
+}
+
+.details-table th.col-size {
+  font-size: 11px;
+}
+
+/* Assets list: confirmation after a delete. */
+.flash {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--danger-border);
+  border-radius: 10px;
+  background: var(--danger-bg);
+  color: #8a2b1a;
+  font-size: 0.9rem;
 }
 
 /* === end Assets pages === */
