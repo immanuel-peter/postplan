@@ -1,66 +1,141 @@
 <% layout("../layouts/main") %>
 <h1>API keys</h1>
-<p class="lede">Generate a Token, then send it as <code>Authorization: Bearer</code> in curl.</p>
 <% if (it.error) { %>
   <p class="form-error"><%= it.error %></p>
 <% } %>
-<form class="generate-form" method="post" action="/keys">
-  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-  <label for="name">Name</label>
-  <input id="name" name="name" type="text" placeholder="API · UTC stamp" autocomplete="off" />
-  <button class="btn-primary" type="submit">Generate a new API key</button>
-</form>
-<p class="note">Each visit can mint a fresh key. Keys are shown once.</p>
-<% if (it.secret) { %>
-  <div class="secret-panel">
-    <p>Copy this Token now. It will not be shown again.</p>
-    <pre><code id="new-secret"><%= it.secret %></code></pre>
-    <button class="btn-copy" type="button" id="copy-secret">Copy</button>
+<section class="panel" aria-labelledby="new-key-title">
+  <div class="panel-body">
+    <h2 id="new-key-title">New key</h2>
+    <form class="generate-form" method="post" action="/keys">
+      <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" placeholder="e.g. CI script" autocomplete="off" />
+      </div>
+      <button class="btn-primary" type="submit">Generate a new API key</button>
+    </form>
+    <p class="note">Keys are shown once.</p>
+    <% if (it.secret) { %>
+      <div class="secret-panel">
+        <p>Copy this Token now. It will not be shown again.</p>
+        <pre><code id="new-secret"><%= it.secret %></code></pre>
+        <button class="btn-copy" type="button" id="copy-secret">Copy</button>
+      </div>
+      <script>
+        (function () {
+          var button = document.getElementById("copy-secret");
+          var code = document.getElementById("new-secret");
+          if (!button || !code) return;
+          button.addEventListener("click", function () {
+            var text = code.textContent || "";
+            navigator.clipboard.writeText(text).then(function () {
+              button.textContent = "Copied";
+              setTimeout(function () { button.textContent = "Copy"; }, 1500);
+            });
+          });
+        })();
+      </script>
+    <% } %>
   </div>
-  <script>
-    (function () {
-      var button = document.getElementById("copy-secret");
-      var code = document.getElementById("new-secret");
-      if (!button || !code) return;
-      button.addEventListener("click", function () {
-        var text = code.textContent || "";
-        navigator.clipboard.writeText(text).then(function () {
-          button.textContent = "Copied";
-          setTimeout(function () { button.textContent = "Copy"; }, 1500);
-        });
-      });
-    })();
-  </script>
-<% } %>
-<h2 class="section-title">Active keys</h2>
-<table class="plain keys-table">
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Created</th>
-      <th>Last used</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    <% if (it.tokens.length === 0) { %>
-      <tr><td class="muted" colspan="4">No active keys.</td></tr>
-    <% } %>
-    <% for (const token of it.tokens) { %>
+</section>
+
+<section class="panel" aria-labelledby="keys-title">
+  <div class="panel-head">
+    <div class="panel-title">
+      <h2 id="keys-title">Keys</h2>
+      <span class="panel-count"><%= it.tokens.length %></span>
+    </div>
+  </div>
+  <table class="data-table">
+    <thead>
       <tr>
-        <td>
-          <div><%= token.name %></div>
-          <div class="prefix"><%= token.prefix %></div>
-        </td>
-        <td class="muted"><%= token.createdLabel %></td>
-        <td class="muted"><%= token.lastUsedLabel %></td>
-        <td class="revoke-cell">
-          <form method="post" action="/keys/<%= token.id %>/revoke">
-            <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-            <button class="link-button" type="submit">Revoke</button>
-          </form>
-        </td>
+        <th scope="col">Name</th>
+        <th scope="col" class="col-time hide-xs">Created</th>
+        <th scope="col" class="col-time hide-xs">Last used</th>
+        <th scope="col" class="col-action"><span class="sr-only">Actions</span></th>
       </tr>
-    <% } %>
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      <% if (it.tokens.length === 0) { %>
+        <tr class="empty-row"><td colspan="4">No keys.</td></tr>
+      <% } %>
+      <% for (const token of it.tokens) { %>
+        <tr>
+          <td>
+            <div class="cell-title"><%= token.name %></div>
+            <div class="cell-sub mono"><%= token.prefix %>…</div>
+            <div class="row-meta">
+              <% if (token.lastUsedIso) { %>Last used <time datetime="<%= token.lastUsedIso %>" data-local><%= token.lastUsedLabel %></time><% } else { %>Never used<% } %>
+            </div>
+          </td>
+          <td class="col-time hide-xs">
+            <% if (token.createdIso) { %><time datetime="<%= token.createdIso %>" data-local><%= token.createdLabel %></time><% } else { %><%= token.createdLabel %><% } %>
+          </td>
+          <td class="col-time hide-xs">
+            <% if (token.lastUsedIso) { %><time datetime="<%= token.lastUsedIso %>" data-local><%= token.lastUsedLabel %></time><% } else { %>Never<% } %>
+          </td>
+          <td class="col-action">
+            <form method="post" action="/keys/<%= token.id %>/revoke" data-confirm-name="<%= token.name %>" data-confirm-prefix="<%= token.prefix %>">
+              <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+              <button class="btn btn-sm btn-danger-soft" type="submit" aria-label="Revoke <%= token.name %>">Revoke</button>
+            </form>
+          </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+</section>
+
+<dialog class="confirm" id="revoke-dialog" aria-labelledby="revoke-title">
+  <h2 id="revoke-title">Revoke “<span data-name></span>”?</h2>
+  <p>Anything using <code data-prefix></code> stops working right away. This can’t be undone.</p>
+  <div class="dialog-actions">
+    <button class="btn btn-secondary" type="button" data-cancel autofocus>Cancel</button>
+    <button class="btn btn-danger" type="button" data-confirm>Revoke key</button>
+  </div>
+</dialog>
+<script>
+  (function () {
+    var dialog = document.getElementById("revoke-dialog");
+    var forms = document.querySelectorAll("form[data-confirm-name]");
+    var useDialog =
+      typeof HTMLDialogElement === "function" && dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function";
+    var pending = null;
+
+    function ask(form) {
+      var name = form.getAttribute("data-confirm-name") || "";
+      var prefix = (form.getAttribute("data-confirm-prefix") || "") + "…";
+      if (!useDialog) {
+        var message = "Revoke “" + name + "”? Anything using " + prefix + " stops working right away. This can’t be undone.";
+        if (window.confirm(message)) form.submit();
+        return;
+      }
+      pending = form;
+      dialog.querySelector("[data-name]").textContent = name;
+      dialog.querySelector("[data-prefix]").textContent = prefix;
+      dialog.showModal();
+    }
+
+    for (var i = 0; i < forms.length; i++) {
+      forms[i].addEventListener("submit", function (event) {
+        event.preventDefault();
+        ask(event.currentTarget);
+      });
+    }
+
+    if (!useDialog) return;
+    dialog.querySelector("[data-cancel]").addEventListener("click", function () {
+      dialog.close();
+    });
+    dialog.querySelector("[data-confirm]").addEventListener("click", function () {
+      var form = pending;
+      pending = null;
+      dialog.close();
+      // form.submit() skips the submit listener above, so this posts for real.
+      if (form) form.submit();
+    });
+    dialog.addEventListener("close", function () {
+      pending = null;
+    });
+  })();
+</script>

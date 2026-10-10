@@ -22,7 +22,7 @@ import {
   type RelyingParty,
 } from "../lib/admin-auth.js";
 import { dashboardHostConstraint, isDashboardHostKind } from "../lib/host.js";
-import { formatStamp } from "../lib/time.js";
+import { formatStamp, isoStamp } from "../lib/time.js";
 import { hashToken, hashesEqual } from "../lib/tokens.js";
 import {
   addCredential,
@@ -592,16 +592,17 @@ async function securityViewModel(
     passkeys: credentials.map((credential) => ({
       id: credential.id,
       name: credential.name,
-      transports: credential.transports.join(", "),
       createdLabel: formatStamp(credential.createdAt),
+      createdIso: isoStamp(credential.createdAt),
       lastUsedLabel: formatStamp(credential.lastUsedAt),
+      lastUsedIso: isoStamp(credential.lastUsedAt),
     })),
     sessions: sessions.map((session) => ({
       id: session.id,
       label: deviceLabel(session.userAgent),
       current: session.id === request.adminSession?.id,
-      createdLabel: formatStamp(session.createdAt),
       expiresLabel: expiresLabel(session.expiresAt),
+      expiresIso: isoStamp(session.expiresAt),
     })),
   };
 }

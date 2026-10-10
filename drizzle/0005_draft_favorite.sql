@@ -1,0 +1,1 @@
+ALTER TABLE "drafts" ADD COLUMN "favorite" boolean DEFAULT false NOT NULL;

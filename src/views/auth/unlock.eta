@@ -1,6 +1,5 @@
 <% layout("../layouts/auth") %>
-<h1>Unlock PostPlan</h1>
-<p class="lede gate-lede">This dashboard is private. Verify with a passkey to continue.</p>
+<h1 class="unlock-title">Welcome!</h1>
 <p class="alert-error" id="unlock-error" hidden></p>
 <button class="btn-primary btn-icon" type="button" id="unlock">
   <svg class="fingerprint" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -12,14 +11,12 @@
   </svg>
   <span id="unlock-label">Unlock with passkey</span>
 </button>
-<p class="note" id="unlock-note">Touch ID, or your device password if you prefer.</p>
-<div class="gate-foot">
-  <% if (it.recoverable) { %>
+<p class="note" id="unlock-note" hidden></p>
+<% if (it.recoverable) { %>
+  <div class="gate-foot">
     <p class="note">Lost every passkey? <a href="/setup">Use your recovery secret</a> to enroll a replacement.</p>
-  <% } else { %>
-    <p class="note">Published Drafts and Assets stay public. Only the dashboard is locked.</p>
-  <% } %>
-</div>
+  </div>
+<% } %>
 <script src="/static/webauthn.js"></script>
 <script>
   (function () {
@@ -35,12 +32,14 @@
       button.disabled = true;
       label.textContent = "Waiting for your passkey…";
       note.textContent = "Your browser is asking for verification. Finish it there.";
+      note.hidden = false;
 
       postplanUnlock(next).catch(function (err) {
         button.classList.remove("is-waiting");
         button.disabled = false;
         label.textContent = "Try again";
-        note.textContent = "Touch ID, or your device password if you prefer.";
+        note.hidden = true;
+        note.textContent = "";
         error.textContent = err && err.message ? err.message : "That passkey wasn’t verified. Try again.";
         error.hidden = false;
       });

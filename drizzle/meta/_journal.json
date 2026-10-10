@@ -36,6 +36,13 @@
       "when": 1789581851556,
       "tag": "0004_slim_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791615884722,
+      "tag": "0005_draft_favorite",
+      "breakpoints": true
     }
   ]
 }

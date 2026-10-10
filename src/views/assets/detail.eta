@@ -1,15 +1,68 @@
 <% layout("../layouts/main") %>
 <a class="back" href="/assets">← Assets</a>
-<h1><%= it.asset.filename %></h1>
-<% if (it.asset.description) { %>
-  <p class="lede"><%= it.asset.description %></p>
-<% } %>
-<p class="public-url-row">
-  <a class="public-url" href="<%= it.asset.previewUrl %>" target="_blank" rel="noreferrer"><%= it.asset.previewUrl %></a>
+<div class="page-head">
+  <h1 class="asset-title"><%= it.asset.filename %></h1>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="<%= it.asset.previewUrl %>" target="_blank" rel="noreferrer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M14 4h6v6" />
+        <path d="M20 4l-9 9" />
+        <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+      </svg>
+      <span>Open</span>
+    </a>
+    <form method="post" action="/assets/<%= it.asset.id %>/delete" id="delete-form">
+      <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+      <button class="btn btn-danger-soft" type="submit">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+          <path d="M9 7V4h6v3" />
+        </svg>
+        <span>Delete</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<form class="desc-form" id="desc-form" method="post" action="/assets/<%= it.asset.id %>">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+  <button class="desc-display" type="button" id="desc-display" aria-label="Edit description">
+    <span class="desc-text<%= it.asset.description ? '' : ' is-empty' %>" id="desc-text"><%= it.asset.description || "Add a description" %></span>
+    <svg class="desc-pencil" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  </button>
+  <div class="desc-editor">
+    <div class="desc-row">
+      <input id="description" name="description" type="text" maxlength="2000" value="<%= it.asset.descriptionValue %>" placeholder="Describe the file for screen readers" aria-label="Description" autocomplete="off" />
+      <button class="btn btn-dark btn-sm desc-save" type="submit">Save</button>
+    </div>
+    <p class="desc-help"><span>Enter to save · Esc to cancel · Used as alt text</span><span id="desc-count"><%= it.asset.descriptionValue.length %> / 125</span></p>
+  </div>
+  <p class="desc-status" id="desc-status" role="status" hidden>
+    <svg class="desc-status-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+    <span data-msg></span>
+  </p>
+</form>
+
+<p class="url-row">
+  <a class="public-url" id="asset-url" href="<%= it.asset.previewUrl %>" target="_blank" rel="noreferrer"><%= it.asset.previewUrl %></a>
+  <button class="icon-btn" type="button" data-copy="asset-url" aria-label="Copy link">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a1 1 0 0 1 1-1h10" />
+    </svg>
+    <span data-copy-label>Copy</span>
+  </button>
 </p>
+
 <div class="preview-card">
   <% if (it.asset.kind === "image") { %>
-    <img src="<%= it.asset.previewUrl %>" alt="<%= it.asset.altSource %>" />
+    <img id="asset-preview" src="<%= it.asset.previewUrl %>" alt="<%= it.asset.altSource %>" />
   <% } else if (it.asset.kind === "video") { %>
     <video src="<%= it.asset.previewUrl %>" controls preload="metadata"></video>
   <% } else if (it.asset.kind === "audio") { %>
@@ -26,63 +79,212 @@
     </div>
   <% } %>
 </div>
-<h2 class="section-title">Embed</h2>
-<% const rows = [
-  { label: "Direct link", value: it.snippets.direct, id: "embed-direct" },
-  { label: "Markdown", value: it.snippets.markdown, id: "embed-markdown" },
-  { label: "HTML", value: it.snippets.html, id: "embed-html" },
-  { label: "curl", value: it.snippets.curl, id: "embed-curl" },
+
+<% const references = [
+  { label: "Markdown", value: it.snippets.markdown, id: "ref-markdown", kind: "markdown" },
+  { label: "HTML", value: it.snippets.html, id: "ref-html", kind: "html" },
+  { label: "curl", value: it.snippets.curl, id: "ref-curl", kind: "curl" },
 ]; %>
-<div class="embed-rows">
-  <% for (const row of rows) { %>
-    <div class="embed-row">
-      <span class="embed-label"><%= row.label %></span>
-      <code class="embed-value" id="<%= row.id %>"><%= row.value %></code>
-      <button class="btn-copy copy-btn" type="button" data-copy="<%= row.id %>">Copy</button>
+<section class="panel" aria-labelledby="reference-title">
+  <div class="panel-head">
+    <h2 id="reference-title">Reference</h2>
+  </div>
+  <% for (const ref of references) { %>
+    <div class="ref-row">
+      <span class="ref-label"><%= ref.label %></span>
+      <code class="ref-value" id="<%= ref.id %>" data-snippet="<%= ref.kind %>" title="<%= ref.value %>"><%= ref.value %></code>
+      <button class="btn btn-sm btn-secondary" type="button" data-copy="<%= ref.id %>" aria-label="Copy <%= ref.label %>"><span data-copy-label>Copy</span></button>
     </div>
   <% } %>
-</div>
+</section>
+
+<section class="panel" aria-labelledby="details-title">
+  <div class="panel-head">
+    <h2 id="details-title">Details</h2>
+  </div>
+  <table class="data-table details-table">
+    <thead>
+      <tr>
+        <th scope="col">Type</th>
+        <th scope="col" class="col-size hide-xs">Size</th>
+        <th scope="col" class="col-time hide-xs">Uploaded</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <span class="mono"><%= it.asset.contentType %></span>
+          <div class="row-meta">
+            <span><%= it.asset.sizeLabel %></span>
+            <span aria-hidden="true">·</span>
+            <time datetime="<%= it.asset.uploadedIso %>" data-local><%= it.asset.uploadedLabel %></time>
+          </div>
+        </td>
+        <td class="col-size hide-xs"><%= it.asset.sizeLabel %></td>
+        <td class="col-time hide-xs"><time datetime="<%= it.asset.uploadedIso %>" data-local><%= it.asset.uploadedLabel %></time></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<dialog class="confirm" id="delete-dialog" aria-labelledby="delete-title">
+  <h2 id="delete-title">Delete “<%= it.asset.filename %>”?</h2>
+  <p>Its public URL stops working right away, so drafts and pages that embed it will show a broken file. This can’t be undone.</p>
+  <div class="dialog-actions">
+    <button class="btn btn-secondary" type="button" data-cancel autofocus>Cancel</button>
+    <button class="btn btn-danger" type="button" data-confirm>Delete asset</button>
+  </div>
+</dialog>
+
 <script>
   (function () {
-    var buttons = document.querySelectorAll("[data-copy]");
-    buttons.forEach(function (button) {
+    // Copy buttons: copy the target's text and briefly confirm.
+    var copyButtons = document.querySelectorAll("[data-copy]");
+    copyButtons.forEach(function (button) {
       button.addEventListener("click", function () {
         var target = document.getElementById(button.getAttribute("data-copy"));
-        if (!target) return;
+        var label = button.querySelector("[data-copy-label]");
+        if (!target || !label) return;
         navigator.clipboard.writeText(target.textContent || "").then(function () {
-          button.textContent = "Copied";
-          setTimeout(function () { button.textContent = "Copy"; }, 1500);
+          label.textContent = "Copied";
+          setTimeout(function () { label.textContent = "Copy"; }, 1500);
         });
       });
     });
   })();
+
+  (function () {
+    // Description: shown as text, edited in place. Without this script the form posts normally.
+    var form = document.getElementById("desc-form");
+    var display = document.getElementById("desc-display");
+    var text = document.getElementById("desc-text");
+    var input = document.getElementById("description");
+    var count = document.getElementById("desc-count");
+    var status = document.getElementById("desc-status");
+    var message = status.querySelector("[data-msg]");
+    var preview = document.getElementById("asset-preview");
+    var url = <%~ JSON.stringify(it.asset.previewUrl) %>;
+    var fallbackAlt = <%~ JSON.stringify(it.asset.altFallback) %>;
+    var csrf = form.querySelector('input[name="_csrf"]').value;
+    var saved = input.value.trim();
+    var saving = false;
+    var timer = null;
+
+    form.classList.add("is-inline");
+
+    function updateCount() {
+      count.textContent = input.value.length + " / 125";
+    }
+
+    function showStatus(kind, words) {
+      clearTimeout(timer);
+      status.className = "desc-status is-" + kind;
+      message.textContent = words;
+      status.hidden = false;
+      if (kind === "saved") {
+        timer = setTimeout(function () { status.hidden = true; }, 2000);
+      }
+    }
+
+    function render(value) {
+      var alt = value || fallbackAlt;
+      text.textContent = value || "Add a description";
+      text.classList.toggle("is-empty", !value);
+      if (preview) preview.alt = alt;
+      var markdown = document.querySelector('[data-snippet="markdown"]');
+      var html = document.querySelector('[data-snippet="html"]');
+      markdown.textContent = "![" + alt + "](" + url + ")";
+      html.textContent = '<img src="' + url + '" alt="' + alt.replaceAll('"', "&quot;") + '">';
+      markdown.title = markdown.textContent;
+      html.title = html.textContent;
+    }
+
+    function open() {
+      input.value = saved;
+      updateCount();
+      form.classList.add("is-editing");
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    // Refocus the text only when the edit ended from the keyboard, not when focus moved elsewhere.
+    function close(refocus) {
+      form.classList.remove("is-editing");
+      if (refocus) display.focus();
+    }
+
+    async function commit(refocus) {
+      if (saving) return;
+      var value = input.value.trim();
+      if (value === saved) {
+        close(refocus);
+        return;
+      }
+      saving = true;
+      try {
+        var response = await fetch(form.action, {
+          method: "POST",
+          credentials: "same-origin",
+          redirect: "manual",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ _csrf: csrf, description: value }),
+        });
+        // The route answers with a redirect back to this page.
+        if (response.type !== "opaqueredirect" && !response.ok) throw new Error("save failed");
+        saved = value;
+        render(value);
+        close(refocus);
+        showStatus("saved", "Saved");
+      } catch (err) {
+        showStatus("error", "Couldn’t save the description. Try again.");
+      } finally {
+        saving = false;
+      }
+    }
+
+    display.addEventListener("click", open);
+    input.addEventListener("input", updateCount);
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commit(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        input.value = saved;
+        close(true);
+      }
+    });
+    input.addEventListener("blur", function () {
+      if (form.classList.contains("is-editing")) commit(false);
+    });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      commit(true);
+    });
+  })();
+
+  (function () {
+    // Delete asks in a dialog first; without dialog support it falls back to confirm().
+    var form = document.getElementById("delete-form");
+    var dialog = document.getElementById("delete-dialog");
+    var useDialog =
+      typeof HTMLDialogElement === "function" && dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (useDialog) {
+        dialog.showModal();
+      } else if (window.confirm(dialog.querySelector("h2").textContent + " This can’t be undone.")) {
+        form.submit();
+      }
+    });
+    if (!useDialog) return;
+    dialog.querySelector("[data-cancel]").addEventListener("click", function () {
+      dialog.close();
+    });
+    dialog.querySelector("[data-confirm]").addEventListener("click", function () {
+      dialog.close();
+      // form.submit() skips the submit listener above, so this posts for real.
+      form.submit();
+    });
+  })();
 </script>
-<h2 class="section-title">Details</h2>
-<table class="plain">
-  <thead>
-    <tr>
-      <th>Type</th>
-      <th>Size</th>
-      <th>Sha-256</th>
-      <th>Uploaded</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td class="mono"><%= it.asset.contentType %></td>
-      <td><%= it.asset.sizeLabel %></td>
-      <td class="mono" title="<%= it.asset.sha256 %>"><%= it.asset.shaShort %></td>
-      <td class="muted mono"><%= it.asset.uploadedLabel %></td>
-    </tr>
-  </tbody>
-</table>
-<form class="edit-form" method="post" action="/assets/<%= it.asset.id %>">
-  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-  <label for="description">Description</label>
-  <textarea id="description" name="description" rows="3" maxlength="2000"><%= it.asset.descriptionValue %></textarea>
-  <button class="btn-primary btn-compact" type="submit">Save</button>
-</form>
-<form class="delete-form" method="post" action="/assets/<%= it.asset.id %>/delete" onsubmit="return confirm('Delete asset?')">
-  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-  <button class="link-button" type="submit">Delete asset</button>
-</form>

@@ -40,6 +40,7 @@ function asDraft(row: typeof drafts.$inferSelect): DraftRecord {
     repositoryName: row.repositoryName,
     gitRef: row.gitRef,
     gitCommit: row.gitCommit,
+    favorite: row.favorite,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     deletedAt: row.deletedAt,
@@ -219,6 +220,7 @@ export async function createDraft(input: {
       repositoryName: input.repositoryName ?? null,
       gitRef: input.gitRef ?? null,
       gitCommit: input.gitCommit ?? null,
+      favorite: false,
       createdAt: now,
       updatedAt: now,
       deletedAt: null,
@@ -411,6 +413,26 @@ export async function patchDraft(input: {
       updatedAt: new Date(),
     })
     .where(eq(drafts.id, input.id))
+    .returning();
+  if (!updated) {
+    return { kind: "not_found", title: "Not found", detail: "draft not found" };
+  }
+  return asDraft(updated);
+}
+
+/**
+ * Stars or unstars an active Draft. Leaves `updatedAt` alone: starring is a dashboard preference,
+ * not a content edit, so it must not bump the Draft up the newest-first order or the API cursor.
+ */
+export async function setDraftFavorite(input: {
+  db: Database;
+  id: string;
+  favorite: boolean;
+}): Promise<DraftRecord | ServiceError> {
+  const [updated] = await input.db
+    .update(drafts)
+    .set({ favorite: input.favorite })
+    .where(and(eq(drafts.id, input.id), eq(drafts.status, "active"), isNull(drafts.deletedAt)))
     .returning();
   if (!updated) {
     return { kind: "not_found", title: "Not found", detail: "draft not found" };

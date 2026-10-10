@@ -13,6 +13,7 @@ export type DraftRecord = {
   repositoryName: string | null;
   gitRef: string | null;
   gitCommit: string | null;
+  favorite: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
