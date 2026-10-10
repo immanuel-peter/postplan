@@ -72,7 +72,7 @@
       <td class="mono"><%= it.asset.contentType %></td>
       <td><%= it.asset.sizeLabel %></td>
       <td class="mono" title="<%= it.asset.sha256 %>"><%= it.asset.shaShort %></td>
-      <td class="muted mono"><%= it.asset.uploadedLabel %></td>
+      <td class="muted mono"><time datetime="<%= it.asset.uploadedIso %>" data-local><%= it.asset.uploadedLabel %></time></td>
     </tr>
   </tbody>
 </table>

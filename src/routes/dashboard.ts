@@ -9,6 +9,7 @@ import {
   listDrafts,
   listVersions,
   patchDraft,
+  setDraftFavorite,
   type DraftUrls,
 } from "../services/drafts.js";
 import {
@@ -31,20 +32,35 @@ type IdParams = {
   id: string;
 };
 
+type DraftListShow = "all" | "favorites";
+
 type DraftListRow = {
   id: string;
   title: string;
   publicUrl: string;
   description: string;
+  favorite: boolean;
   versionLabel: string;
-  versionsLabel: string;
   updatedLabel: string;
+  updatedIso: string;
+  detailUrl: string;
+  /** Only set for http(s) URLs, so the template never links anything else. */
+  repositoryUrl: string | null;
+  repoOwner: string;
+  repoName: string;
+  /** `owner/name`, or just the name when there is no owner; "" when the Draft has no repository. */
+  repoLabel: string;
+  isGithub: boolean;
+  /** Tints the row: favorites pinned above the rest in the "all" view. */
+  isFavorite: boolean;
+  /** First non-favorite row under the pinned favorites in the "all" view; draws a stronger rule. */
+  afterFavorites: boolean;
 };
 
-type DraftListGroup = {
-  heading: string;
-  repositoryUrl: string | null;
-  drafts: DraftListRow[];
+type DraftList = {
+  rows: DraftListRow[];
+  totalCount: number;
+  favoriteCount: number;
 };
 
 type VersionRow = {
@@ -54,6 +70,7 @@ type VersionRow = {
   dirty: boolean;
   refLabel: string;
   publishedLabel: string;
+  publishedIso: string;
 };
 
 type TokenRow = {
@@ -92,10 +109,6 @@ function draftTitle(title: string | null): string {
   return trimmed === "" ? "Untitled draft" : trimmed;
 }
 
-function versionCountLabel(count: number): string {
-  return count === 1 ? "1 version" : `${String(count)} versions`;
-}
-
 function fileCountLabel(count: number): string {
   return count === 1 ? "1 file" : `${String(count)} files`;
 }
@@ -115,50 +128,84 @@ function refLabel(gitRef: string | null, gitCommit: string | null): string {
   return "—";
 }
 
-function toListRow(draft: DraftRecord, urls: DraftUrls): DraftListRow {
+function parseShow(value: unknown): DraftListShow {
+  return value === "favorites" ? "favorites" : "all";
+}
+
+function httpUrl(value: string | null): URL | null {
+  const trimmed = value?.trim() ?? "";
+  if (trimmed === "") {
+    return null;
+  }
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+type RepoFields = Pick<DraftListRow, "repositoryUrl" | "repoOwner" | "repoName" | "repoLabel" | "isGithub">;
+
+/**
+ * Splits the repository into owner and name for display. The stored name wins; without one, the
+ * URL path stands in (`https://github.com/owner/name.git` → `owner` / `name`). Anything up to the
+ * last "/" is the owner, so a nested GitLab path keeps its groups in the owner part.
+ */
+function repoFields(draft: DraftRecord): RepoFields {
+  const url = httpUrl(draft.repositoryUrl);
+  const fromName = draft.repositoryName?.trim() ?? "";
+  const source = fromName !== "" ? fromName : (url?.pathname.replace(/\.git$/, "") ?? "");
+  const path = source.replace(/^\/+|\/+$/g, "") || (url?.host ?? "");
+  const slash = path.lastIndexOf("/");
+  const repoOwner = slash === -1 ? "" : path.slice(0, slash);
+  const repoName = slash === -1 ? path : path.slice(slash + 1);
+  return {
+    repositoryUrl: url ? (draft.repositoryUrl?.trim() ?? null) : null,
+    repoOwner,
+    repoName,
+    repoLabel: repoOwner === "" ? repoName : `${repoOwner}/${repoName}`,
+    isGithub: url !== null && (url.hostname === "github.com" || url.hostname === "www.github.com"),
+  };
+}
+
+function toListRow(
+  draft: DraftRecord,
+  urls: DraftUrls,
+  flags: Pick<DraftListRow, "isFavorite" | "afterFavorites">,
+): DraftListRow {
   return {
     id: draft.id,
     title: draftTitle(draft.title),
     publicUrl: urls.publicUrl(draft.slug),
     description: draft.description?.trim() ?? "",
+    favorite: draft.favorite,
     versionLabel: `v${String(draft.currentVersion)}`,
-    versionsLabel: versionCountLabel(draft.currentVersion),
     updatedLabel: formatStamp(draft.updatedAt),
+    updatedIso: isoStamp(draft.updatedAt),
+    detailUrl: `/drafts/${draft.id}`,
+    ...repoFields(draft),
+    ...flags,
   };
 }
 
-function groupDrafts(drafts: DraftRecord[], urls: DraftUrls): DraftListGroup[] {
-  const buckets = new Map<string, DraftRecord[]>();
-  for (const draft of drafts) {
-    const key = draft.repositoryName?.trim() ?? "";
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.push(draft);
-    } else {
-      buckets.set(key, [draft]);
-    }
-  }
-
-  const named = [...buckets.keys()].filter((key) => key !== "").sort((a, b) => a.localeCompare(b));
-  const keys = buckets.has("") ? [...named, ""] : named;
-
-  return keys.map((key) => {
-    const items = buckets.get(key) ?? [];
-    items.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-    let repositoryUrl: string | null = null;
-    for (const draft of items) {
-      const url = draft.repositoryUrl?.trim() ?? "";
-      if (url !== "") {
-        repositoryUrl = url;
-        break;
-      }
-    }
-    return {
-      heading: key === "" ? "No repository" : key,
-      repositoryUrl,
-      drafts: items.map((draft) => toListRow(draft, urls)),
-    };
-  });
+/** One flat list: favorites pinned on top, then everything else, each newest-updated first. */
+function buildDraftList(drafts: DraftRecord[], urls: DraftUrls, show: DraftListShow): DraftList {
+  const ordered = [...drafts].sort(
+    (a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt.getTime() - a.updatedAt.getTime(),
+  );
+  const favoriteCount = ordered.filter((draft) => draft.favorite).length;
+  const visible = show === "favorites" ? ordered.filter((draft) => draft.favorite) : ordered;
+  return {
+    rows: visible.map((draft, index) =>
+      toListRow(draft, urls, {
+        isFavorite: show === "all" && draft.favorite,
+        afterFavorites: show === "all" && favoriteCount > 0 && index === favoriteCount,
+      }),
+    ),
+    totalCount: drafts.length,
+    favoriteCount,
+  };
 }
 
 function toVersionRow(version: VersionRecord, versionUrl: string): VersionRow {
@@ -171,6 +218,7 @@ function toVersionRow(version: VersionRecord, versionUrl: string): VersionRow {
     dirty,
     refLabel: refLabel(version.gitRef, version.gitCommit),
     publishedLabel: formatStamp(version.createdAt),
+    publishedIso: isoStamp(version.createdAt),
   };
 }
 
@@ -256,16 +304,21 @@ async function renderKeys(
 export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   const dashboardOnly = { constraints: { host: dashboardHostConstraint(deps.config.baseDomain) } };
 
-  app.get("/", dashboardOnly, async (request, reply) => {
+  app.get<{ Querystring: { show?: unknown } }>("/", dashboardOnly, async (request, reply) => {
     if (!isDashboardHost(request)) {
       return;
     }
+    const show = parseShow(request.query.show);
     const drafts = await loadActiveDrafts(deps.db);
+    const list = buildDraftList(drafts, deps.urls, show);
     return reply.view("drafts/list", {
-      title: "My drafts",
+      title: "Drafts",
       active: "drafts",
       csrf: request.adminCsrf,
-      groups: groupDrafts(drafts, deps.urls),
+      show,
+      rows: list.rows,
+      totalCount: list.totalCount,
+      favoriteCount: list.favoriteCount,
     });
   });
 
@@ -312,6 +365,22 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       return reply.code(404).type("text/plain").send("not found");
     }
     return reply.redirect(`/drafts/${updated.id}`);
+  });
+
+  app.post<{ Params: IdParams }>("/drafts/:id/favorite", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    const updated = await setDraftFavorite({
+      db: deps.db,
+      id: request.params.id,
+      favorite: readField(request.body, "favorite") === "1",
+    });
+    if (isServiceError(updated)) {
+      return reply.code(404).type("text/plain").send("not found");
+    }
+    // Back to the view the star was clicked in; only these two fixed paths, never a caller URL.
+    return reply.redirect(readField(request.body, "show") === "favorites" ? "/?show=favorites" : "/");
   });
 
   app.post<{ Params: IdParams }>("/drafts/:id/delete", dashboardOnly, async (request, reply) => {

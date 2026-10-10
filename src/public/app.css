@@ -640,12 +640,17 @@ h2 {
   white-space: nowrap;
 }
 
+/* The owner gives way first; the repository name only truncates when it alone overflows. */
 .repo-name {
-  flex: 0 0.1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.repo-owner-sep {
+  color: var(--muted);
 }
 
 @media (max-width: 960px) {
@@ -1293,10 +1298,58 @@ code {
 }
 
 /* === Drafts pages: page-specific additions go below this line === */
+
+.row-meta-version {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+/* Draft detail: versions table */
+
+.versions-table .col-version {
+  width: 96px;
+}
+
+.versions-table td.mono {
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 600px) {
+  .versions-table .col-version {
+    width: 72px;
+  }
+
+  .versions-table .col-time {
+    width: 150px;
+  }
+}
+
 /* === end Drafts pages === */
 
 /* === Keys, Security, and Unlock pages: page-specific additions go below this line === */
+
+/* API keys: keep the confirm dialog out of the page where <dialog> is unknown. */
+#revoke-dialog:not([open]) {
+  display: none;
+}
+
+/* Security: the error alert sits between the lede and the first panel. */
+#passkey-error + .panel {
+  margin-top: 0;
+}
+
+/* Unlock: there is no lede under the heading, so the heading sets the gap to the button. */
+.unlock-title {
+  margin-bottom: 1.25rem;
+}
+
 /* === end Keys, Security, and Unlock pages === */
 
 /* === Assets pages: page-specific additions go below this line === */
+
+/* .assets-table .col-size sets the cell font size; keep the header at the table-header size. */
+.assets-table th.col-size {
+  font-size: 11px;
+}
+
 /* === end Assets pages === */
