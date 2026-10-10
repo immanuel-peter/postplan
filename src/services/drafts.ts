@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { Database } from "../db/client.js";
 import { draftVersions, drafts, idempotencyKeys } from "../db/schema.js";
@@ -497,4 +497,16 @@ export async function latestVersion(db: Database, draftId: string): Promise<Vers
     .orderBy(desc(draftVersions.versionNumber))
     .limit(1);
   return row ? asVersion(row) : null;
+}
+
+export async function latestVersions(db: Database, draftIds: string[]): Promise<Map<string, VersionRecord>> {
+  if (draftIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .selectDistinctOn([draftVersions.draftId])
+    .from(draftVersions)
+    .where(inArray(draftVersions.draftId, draftIds))
+    .orderBy(draftVersions.draftId, desc(draftVersions.versionNumber));
+  return new Map(rows.map((row) => [row.draftId, asVersion(row)]));
 }

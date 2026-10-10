@@ -241,6 +241,41 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(bad.statusCode, 400);
   });
 
+  it("lists each draft with its latest version", async () => {
+    const multi = (await createDraft(htmlDoc("multi v1"))).json<DraftBody>();
+    assert.equal((await addVersion(multi.id, htmlDoc("multi v2"), { "if-match": '"1"' })).statusCode, 201);
+    assert.equal((await addVersion(multi.id, htmlDoc("multi v3"), { "if-match": '"2"' })).statusCode, 201);
+    const single = (await createDraft(htmlDoc("single v1"))).json<DraftBody>();
+
+    const listed = await t.app.inject({
+      method: "GET",
+      url: "/api/v1/drafts?limit=100",
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(listed.statusCode, 200, listed.body);
+    const items = listed.json<{ items: DraftBody[] }>().items;
+    const multiItem = items.find((item) => item.id === multi.id);
+    const singleItem = items.find((item) => item.id === single.id);
+    assert.equal(multiItem?.currentVersion, 3);
+    assert.equal(multiItem?.versionUrl, `https://${multi.slug}.postplan.test/v/3`);
+    assert.equal(singleItem?.currentVersion, 1);
+  });
+
+  it("rejects version numbers beyond the safe integer range", async () => {
+    const draft = (await createDraft(htmlDoc("huge"))).json<DraftBody>();
+    const huge = "99999999999999999999";
+
+    const api = await t.app.inject({
+      method: "GET",
+      url: `/api/v1/drafts/${draft.id}/versions/${huge}`,
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(api.statusCode, 400, api.body);
+
+    const pub = await t.app.inject({ method: "GET", url: `/v/${huge}`, headers: draftHost(draft.slug) });
+    assert.equal(pub.statusCode, 404);
+  });
+
   it("404s unknown slugs, bad version paths, and stray paths on draft hosts", async () => {
     const draft = (await createDraft(htmlDoc("paths"))).json<DraftBody>();
     for (const url of ["/v/0", "/v/2", "/v/abc", "/anything"]) {
