@@ -1,10 +1,14 @@
 <% layout("../layouts/auth") %>
-<p class="step">Step 2 of 2</p>
-<h1>Add your passkey</h1>
-<p class="lede gate-lede">Name this device, then verify with Touch ID. That passkey becomes the only way in.</p>
+<% if (it.mode === "recovery") { %>
+  <h1>Replace your passkeys</h1>
+  <p class="lede gate-lede">This replaces every existing passkey and signs out every session.</p>
+<% } else { %>
+  <h1>Add your passkey</h1>
+  <p class="lede gate-lede">Add a second passkey later on the Security page, so a lost device doesn't lock you out.</p>
+<% } %>
 <p class="alert-error" id="enroll-error" hidden></p>
 <label for="device">Device name</label>
-<input id="device" type="text" value="MacBook Pro" autocomplete="off" />
+<input id="device" type="text" value="This device" autocomplete="off" />
 <button class="btn-primary btn-icon" type="button" id="enroll">
   <svg class="fingerprint" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M12 11v2.5a9 9 0 0 1-.9 4" />
@@ -15,11 +19,6 @@
   </svg>
   <span id="enroll-label">Create passkey</span>
 </button>
-<% if (it.mode === "recovery") { %>
-  <p class="note">This replaces every existing passkey and signs out every session.</p>
-<% } else { %>
-  <p class="note">Once this succeeds, setup closes for good and <code>ADMIN_SETUP_SECRET</code> can be removed. Add a second passkey afterwards on the Security page, so a lost device doesn’t lock you out.</p>
-<% } %>
 <script id="pk-options" type="application/json"><%~ it.options %></script>
 <script src="/static/webauthn.js"></script>
 <script>
@@ -29,6 +28,21 @@
     var error = document.getElementById("enroll-error");
     var name = document.getElementById("device");
     var options = JSON.parse(document.getElementById("pk-options").textContent);
+
+    var ua = navigator.userAgent;
+    if (/iPhone/.test(ua)) {
+      name.value = "iPhone";
+    } else if (/iPad/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) {
+      name.value = "iPad";
+    } else if (/Android/.test(ua)) {
+      name.value = "Android device";
+    } else if (/Macintosh|Mac OS X/.test(ua)) {
+      name.value = "Mac";
+    } else if (/Windows/.test(ua)) {
+      name.value = "Windows PC";
+    } else if (/Linux/.test(ua)) {
+      name.value = "Linux PC";
+    }
 
     button.addEventListener("click", function () {
       error.hidden = true;
