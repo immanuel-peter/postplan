@@ -1,4 +1,4 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, lt, or, sql } from "drizzle-orm";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { Database } from "../db/client.js";
 import { assets } from "../db/schema.js";
@@ -309,6 +309,44 @@ export async function listAssets(input: {
   return {
     items: page.map(asAsset),
     nextCursor: extra ? (page[page.length - 1]?.createdAt.toISOString() ?? null) : null,
+  };
+}
+
+export type AssetNeighbor = { id: string; filename: string | null };
+
+export type AssetNeighbors = {
+  /** 1-based place in the dashboard list, newest first. */
+  position: number;
+  total: number;
+  /** The row above in the list (uploaded after this one), or null for the newest. */
+  previous: AssetNeighbor | null;
+  /** The row below in the list (uploaded before this one), or null for the oldest. */
+  next: AssetNeighbor | null;
+};
+
+/**
+ * Where an Asset sits in the dashboard list (newest first) and the Assets on either side of it.
+ * Ties on `created_at` break by id so the order stays total.
+ */
+export async function getAssetNeighbors(db: Database, asset: AssetRecord): Promise<AssetNeighbors> {
+  const sameTime = eq(assets.createdAt, asset.createdAt);
+  const newer = or(gt(assets.createdAt, asset.createdAt), and(sameTime, gt(assets.id, asset.id)));
+  const older = or(lt(assets.createdAt, asset.createdAt), and(sameTime, lt(assets.id, asset.id)));
+  const pick = { id: assets.id, filename: assets.filename };
+
+  const [[counts], [previous], [next]] = await Promise.all([
+    db
+      .select({ total: count(), newer: sql<number>`count(*) filter (where ${newer})`.mapWith(Number) })
+      .from(assets),
+    db.select(pick).from(assets).where(newer).orderBy(asc(assets.createdAt), asc(assets.id)).limit(1),
+    db.select(pick).from(assets).where(older).orderBy(desc(assets.createdAt), desc(assets.id)).limit(1),
+  ]);
+
+  return {
+    position: (counts?.newer ?? 0) + 1,
+    total: counts?.total ?? 1,
+    previous: previous ?? null,
+    next: next ?? null,
   };
 }
 

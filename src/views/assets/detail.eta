@@ -1,5 +1,32 @@
 <% layout("../layouts/main") %>
-<a class="back" href="/assets">← Assets</a>
+<div class="crumb-row<%= it.pager.total > 1 ? ' has-pager' : '' %>">
+  <a class="back" href="/assets">← Assets</a>
+  <% if (it.pager.total > 1) { %>
+    <nav class="crumb-pager" id="asset-pager" aria-label="Browse assets">
+      <span class="pager-hint" id="pager-hint" hidden><kbd>←</kbd><kbd>→</kbd> to browse</span>
+      <% if (it.pager.previous) { %>
+        <a class="pager-btn" id="pager-prev" rel="prev" href="<%= it.pager.previous.href %>" aria-label="Previous asset: <%= it.pager.previous.name %>" aria-keyshortcuts="ArrowLeft" title="Previous asset (←)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+        </a>
+      <% } else { %>
+        <span class="pager-btn is-disabled" id="pager-prev-end" aria-hidden="true" title="First asset">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+        </span>
+      <% } %>
+      <span class="pager-count"><b><%= it.pager.position %></b> of <%= it.pager.total %></span>
+      <% if (it.pager.next) { %>
+        <a class="pager-btn" id="pager-next" rel="next" href="<%= it.pager.next.href %>" aria-label="Next asset: <%= it.pager.next.name %>" aria-keyshortcuts="ArrowRight" title="Next asset (→)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </a>
+      <% } else { %>
+        <span class="pager-btn is-disabled" id="pager-next-end" aria-hidden="true" title="Last asset">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </span>
+      <% } %>
+    </nav>
+    <p class="sr-only" id="pager-status" role="status" aria-live="polite"></p>
+  <% } %>
+</div>
 <div class="page-head">
   <h1 class="asset-title"><%= it.asset.filename %></h1>
   <div class="page-actions">
@@ -225,6 +252,7 @@
         var response = await fetch(form.action, {
           method: "POST",
           credentials: "same-origin",
+          keepalive: true,
           redirect: "manual",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({ _csrf: csrf, description: value }),
@@ -260,6 +288,90 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       commit(true);
+    });
+  })();
+
+  (function () {
+    // Left and right arrows step to the neighbouring asset. The pager links work without this script.
+    var pager = document.getElementById("asset-pager");
+    if (!pager) return;
+    var prev = document.getElementById("pager-prev");
+    var next = document.getElementById("pager-next");
+    var hint = document.getElementById("pager-hint");
+    var status = document.getElementById("pager-status");
+    var storeKey = "postplan.assetKeysUsed";
+    var stepMs = 250;
+    var lastStep = 0;
+
+    // The key hint shows until the first arrow press. Without storage it stays hidden rather than nag.
+    function keysUsed() {
+      try {
+        return window.localStorage.getItem(storeKey) === "1";
+      } catch (err) {
+        return true;
+      }
+    }
+    function rememberKeys() {
+      try {
+        window.localStorage.setItem(storeKey, "1");
+      } catch (err) {
+        // Private mode: the hint comes back next time.
+      }
+    }
+    if (hint && !keysUsed()) hint.hidden = false;
+
+    // Replacing the history entry keeps Back to one step from the list, however many assets were stepped through.
+    function go(link) {
+      window.location.replace(link.href);
+    }
+
+    pager.addEventListener("click", function (event) {
+      var link = event.target.closest("a.pager-btn");
+      if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      go(link);
+    });
+
+    function isTyping(el) {
+      if (!el || !el.tagName) return false;
+      if (el.tagName === "TEXTAREA" || el.tagName === "SELECT") return true;
+      if (el.tagName === "INPUT") return !/^(button|checkbox|radio|submit|reset|range)$/.test(el.type);
+      return el.isContentEditable;
+    }
+    // Focused players keep the arrows for seeking; Esc hands them back.
+    function isPlayer(el) {
+      return !!el && (el.tagName === "VIDEO" || el.tagName === "AUDIO");
+    }
+
+    document.addEventListener("keydown", function (event) {
+      if (event.defaultPrevented) return;
+      if (event.key === "Escape" && isPlayer(event.target)) {
+        event.target.blur();
+        return;
+      }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      // Alt and Cmd with arrows are browser Back and Forward; Shift selects text.
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (isTyping(event.target) || isPlayer(event.target) || document.querySelector("dialog[open]")) return;
+      var now = Date.now();
+      if (event.repeat && now - lastStep < stepMs) return;
+      lastStep = now;
+      event.preventDefault();
+      rememberKeys();
+      var forward = event.key === "ArrowRight";
+      var link = forward ? next : prev;
+      if (link) {
+        go(link);
+        return;
+      }
+      // At either end the key does nothing: the list does not wrap.
+      var end = document.getElementById(forward ? "pager-next-end" : "pager-prev-end");
+      if (end) {
+        end.classList.remove("is-bump");
+        void end.offsetWidth;
+        end.classList.add("is-bump");
+      }
+      status.textContent = forward ? "This is the last asset" : "This is the first asset";
     });
   })();
 

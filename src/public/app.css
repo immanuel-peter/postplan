@@ -1559,4 +1559,118 @@ code {
   font-size: 0.9rem;
 }
 
+/* Asset detail: the back link and the pager that steps between neighbouring assets. */
+.crumb-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1.15rem;
+}
+
+.crumb-row .back {
+  margin: 0;
+}
+
+.crumb-row.has-pager {
+  min-height: 2rem;
+}
+
+.crumb-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.pager-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-right: 0.75rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.pager-hint[hidden] {
+  display: none;
+}
+
+.pager-hint kbd {
+  min-width: 1.35rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--input-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: 500 0.72rem/1.35 var(--mono);
+  text-align: center;
+}
+
+.pager-btn {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+a.pager-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.pager-btn.is-disabled {
+  opacity: 0.35;
+}
+
+.pager-count {
+  padding: 0 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pager-count b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+@keyframes pager-bump {
+  30% {
+    transform: translateX(-3px);
+  }
+
+  65% {
+    transform: translateX(3px);
+  }
+}
+
+.pager-btn.is-bump {
+  animation: pager-bump 0.22s ease-in-out;
+}
+
+@media (pointer: coarse) {
+  .pager-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+}
+
+/* No keyboard on a phone, so the hint would only add noise. */
+@media (max-width: 600px), (pointer: coarse) {
+  .pager-hint {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pager-btn.is-bump {
+    animation: none;
+  }
+}
+
 /* === end Assets pages === */
