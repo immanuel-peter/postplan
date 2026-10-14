@@ -48,9 +48,11 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
   mp4: "video/mp4",
   webm: "video/webm",
   mov: "video/quicktime",
+  mp3: "audio/mpeg",
   pdf: "application/pdf",
   zip: "application/zip",
   json: "application/json",
+  csv: "text/csv",
   txt: "text/plain",
   css: "text/css",
 };
@@ -107,7 +109,7 @@ export function assetUrls(input: { baseDomain: string; port: number; nodeEnv: st
 export function contentTypeForUpload(mimetype: string | undefined, filename: string | null): string {
   if (mimetype) {
     const base = mimetype.split(";")[0]?.trim() ?? "";
-    if (/^[^\s/]+\/[^\s;]+$/.test(base)) {
+    if (/^[^\s/]+\/[^\s;]+$/.test(base) && base.toLowerCase() !== "application/octet-stream") {
       return base;
     }
   }

@@ -126,6 +126,38 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     assert.match(row, /<td class="col-type hide-sm">\s*<span class="muted">—<\/span>/);
   });
 
+  it("infers generic dashboard uploads and renders video and audio previews", async () => {
+    for (const [filename, expectedType, tag] of [
+      ["dashboard-clip.mp4", "video/mp4", "video"],
+      ["dashboard-sound.mp3", "audio/mpeg", "audio"],
+      ["dashboard-data.csv", "text/csv", null],
+    ] as const) {
+      const form = multipart([
+        { name: "_csrf", value: session.csrf },
+        { name: "file", filename, contentType: "application/octet-stream", data: "test content" },
+      ]);
+      const uploaded = await t.app.inject({
+        method: "POST", url: "/assets",
+        headers: { ...apiHost(), cookie: session.cookie, origin: ORIGIN, ...form.headers },
+        payload: form.payload,
+      });
+      assert.equal(uploaded.statusCode, 302, uploaded.body);
+      assert.equal(uploaded.headers.location, "/assets");
+
+      const row = rowFor(await page(), filename);
+      const id = /class="asset-filename" href="\/assets\/([^"]+)"/.exec(row)?.[1];
+      assert.ok(id);
+      const asset = await getAsset(t.db, id);
+      assert.ok(!("kind" in asset));
+      assert.equal(asset.contentType, expectedType, filename);
+      const detail = await page(`/assets/${id}`);
+      assert.ok(detail.includes(expectedType));
+      if (tag) {
+        assert.match(detail, new RegExp(`<${tag} src="[^"]+" controls`));
+      }
+    }
+  });
+
   it("stamps the upload time on the detail page for local rendering", async () => {
     const asset = await apiUpload("clip.mp4", "video/mp4", "not really a video");
     const list = await page();
