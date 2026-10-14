@@ -11,6 +11,7 @@ import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
 import { registerAdminGuard } from "./lib/admin-guard.js";
+import { sha256Hex } from "./lib/hash.js";
 import { classifyHost } from "./lib/host.js";
 import { MAX_HTML_BYTES } from "./lib/html.js";
 import { registerApiRoutes } from "./routes/api.js";
@@ -87,6 +88,8 @@ export async function buildApp(deps: AppDeps) {
     throwFileSizeLimit: true,
   });
 
+  const css = readFileSync(join(here, "public", "app.css"), "utf8");
+  const cssVersion = sha256Hex(Buffer.from(css, "utf8")).slice(0, 12);
   const viewsDir = join(here, "views");
   const eta = new Eta({ views: viewsDir, cache: deps.config.nodeEnv === "production" });
   function renderEta(filename: string, data: Record<string, unknown>): string {
@@ -118,6 +121,7 @@ export async function buildApp(deps: AppDeps) {
     root: viewsDir,
     viewExt: "eta",
     propertyName: "view",
+    defaultContext: { cssVersion },
   });
 
   app.addHook("onRequest", async (request, reply) => {
@@ -144,7 +148,6 @@ export async function buildApp(deps: AppDeps) {
     return reply.type("application/json").send(app.swagger());
   });
 
-  const css = readFileSync(join(here, "public", "app.css"), "utf8");
   app.get("/static/app.css", async (_request, reply) => {
     return reply.type("text/css; charset=utf-8").send(css);
   });
