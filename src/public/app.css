@@ -1162,6 +1162,11 @@ code {
   max-width: 100%;
 }
 
+.gate-col h1 + form,
+.gate-col h1 + .alert-error {
+  margin-top: 1.25rem;
+}
+
 .brand {
   display: flex;
   align-items: center;

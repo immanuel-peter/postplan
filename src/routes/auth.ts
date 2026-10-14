@@ -272,7 +272,7 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     );
     setChallengeCookie(reply, rp, id);
     return reply.view("auth/enroll", {
-      title: "Add your passkey",
+      title: mode === "recovery" ? "Replace your passkeys" : "Add your passkey",
       mode,
       options: JSON.stringify(options),
     });
