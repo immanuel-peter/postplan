@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { eq, ne } from "drizzle-orm";
+import { parseFragment } from "parse5";
 import { assets } from "../../src/db/schema.js";
 import { hashToken } from "../../src/lib/tokens.js";
 import { authenticateSession, createSession } from "../../src/services/admin.js";
@@ -11,7 +12,19 @@ import { apiHost, auth, multipart, skipWithoutDb, startTestApp, type TestApp } f
 const ORIGIN = "https://postplan.test";
 const COOKIE = "__Host-postplan_session";
 
-type AssetBody = { id: string; filename: string | null; description: string | null };
+type AssetBody = { id: string; url: string; filename: string | null; description: string | null };
+type Snippets = { markdown: string; html: string; curl: string };
+
+function referenceSnippets(html: string): Snippets {
+  function text(kind: keyof Snippets): string {
+    const match = html.match(new RegExp(`id="ref-${kind}"[^>]*>([\\s\\S]*?)</code>`));
+    assert.ok(match, `missing ${kind} reference`);
+    const nodes = parseFragment(match[1]!).childNodes;
+    assert.ok(nodes.every((node) => node.nodeName === "#text"), "snippets must be escaped text");
+    return nodes.map((node) => "value" in node ? node.value : "").join("");
+  }
+  return { markdown: text("markdown"), html: text("html"), curl: text("curl") };
+}
 
 /** The <tr> in the assets table whose filename link shows `filename`. */
 function rowFor(html: string, filename: string): string {
@@ -205,6 +218,62 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     assert.match(detail, /<dialog class="confirm" id="delete-dialog" aria-labelledby="delete-title">/);
     assert.match(detail, /<h2 id="delete-title">Delete “heatmap\.png”\?<\/h2>/);
     assert.doesNotMatch(detail, /link-button/);
+  });
+
+  for (const [filename, contentType, markdownPrefix, htmlTemplate] of [
+    ["reference-image.png", "image/png", "!", '<img src="URL" alt="LABEL">'],
+    ["reference-video.mp4", "video/mp4", "", '<video controls src="URL" title="LABEL"></video>'],
+    ["reference-audio.mp3", "audio/mpeg", "", '<audio controls src="URL" title="LABEL"></audio>'],
+    ["reference-document.pdf", "application/pdf", "", '<a href="URL">LABEL</a>'],
+    ["reference-data.csv", "text/csv", "", '<a href="URL">LABEL</a>'],
+    ["reference-archive.zip", "application/zip", "", '<a href="URL">LABEL</a>'],
+  ] as const) {
+    it(`keeps ${filename} references correct on load, inline save, and clearing the description`, async () => {
+      const asset = await apiUpload(filename, contentType, "reference fixture");
+      const fallback = filename.slice(0, filename.lastIndexOf("."));
+      const expected = (label: string, markdownLabel = label): Snippets => ({
+        markdown: `${markdownPrefix}[${markdownLabel}](${asset.url})`,
+        html: htmlTemplate.replace("URL", asset.url).replace("LABEL", label),
+        curl: `curl -O ${asset.url}`,
+      });
+      assert.deepEqual(referenceSnippets(await page(`/assets/${asset.id}`)), expected(fallback));
+
+      const description = 'Edited [label] \\ "quote" & <tag> &quot; </script>';
+      const escapedHtml = 'Edited [label] \\ &quot;quote&quot; &amp; &lt;tag&gt; &amp;quot; &lt;/script&gt;';
+      const escapedMarkdown = String.raw`Edited \[label\] \\ "quote" \& \<tag\> \&quot; \</script\>`;
+      for (const [value, references] of [
+        [description, expected(escapedHtml, escapedMarkdown)],
+        ["", expected(fallback)],
+      ] as const) {
+        const saved = await t.app.inject({
+          method: "POST",
+          url: `/assets/${asset.id}`,
+          headers: {
+            ...apiHost(), cookie: session.cookie, origin: ORIGIN,
+            "content-type": "application/x-www-form-urlencoded", accept: "application/json",
+          },
+          payload: new URLSearchParams({ _csrf: session.csrf, description: `  ${value}  ` }).toString(),
+        });
+        assert.equal(saved.statusCode, 200, saved.body);
+        const result = saved.json<{ description: string; altSource: string; snippets: Snippets }>();
+        assert.equal(result.description, value);
+        assert.equal(result.altSource, value || fallback);
+        assert.deepEqual(result.snippets, references);
+        assert.deepEqual(referenceSnippets(await page(`/assets/${asset.id}`)), references);
+        const stored = await getAsset(t.db, asset.id);
+        assert.ok(!("kind" in stored));
+        assert.equal(stored.description, value || null);
+      }
+    });
+  }
+
+  it("preserves entity-like text in Markdown filename fallbacks", async () => {
+    const asset = await apiUpload("AT&amp;T&#169;.png", "image/png", "pixels");
+    assert.deepEqual(referenceSnippets(await page(`/assets/${asset.id}`)), {
+      markdown: `![AT\\&amp;T\\&#169;](${asset.url})`,
+      html: `<img src="${asset.url}" alt="AT&amp;amp;T&amp;#169;">`,
+      curl: `curl -O ${asset.url}`,
+    });
   });
 
   it("saves a description posted from the page, and deleting lands on the list with a notice", async () => {
