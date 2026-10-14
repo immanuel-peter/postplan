@@ -15,10 +15,10 @@ docker compose up --build -d
 ```
 
 Local access points:
-- Dashboard: `http://postplan.localhost:3000/`
-- Drafts: `http://{slug}.postplan.localhost:3000/`
-- Assets: `http://assets.postplan.localhost:3000/<id>`
-- API specification: `http://postplan.localhost:3000/openapi.json`
+- Dashboard: `http://postplan.localhost:3005/`
+- Drafts: `http://{slug}.postplan.localhost:3005/`
+- Assets: `http://assets.postplan.localhost:3005/<id>`
+- API specification: `http://postplan.localhost:3005/openapi.json`
 - Default development token: `pp_local_dev_bootstrap`
 
 ## Publish
