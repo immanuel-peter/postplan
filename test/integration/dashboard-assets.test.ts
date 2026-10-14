@@ -240,7 +240,7 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
 
       const description = 'Edited [label] \\ "quote" & <tag> &quot; </script>';
       const escapedHtml = 'Edited [label] \\ &quot;quote&quot; &amp; &lt;tag&gt; &amp;quot; &lt;/script&gt;';
-      const escapedMarkdown = String.raw`Edited \[label\] \\ "quote" & \<tag\> &quot; \</script\>`;
+      const escapedMarkdown = String.raw`Edited \[label\] \\ "quote" \& \<tag\> \&quot; \</script\>`;
       for (const [value, references] of [
         [description, expected(escapedHtml, escapedMarkdown)],
         ["", expected(fallback)],
@@ -266,6 +266,15 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
       }
     });
   }
+
+  it("preserves entity-like text in Markdown filename fallbacks", async () => {
+    const asset = await apiUpload("AT&amp;T&#169;.png", "image/png", "pixels");
+    assert.deepEqual(referenceSnippets(await page(`/assets/${asset.id}`)), {
+      markdown: `![AT\\&amp;T\\&#169;](${asset.url})`,
+      html: `<img src="${asset.url}" alt="AT&amp;amp;T&amp;#169;">`,
+      curl: `curl -O ${asset.url}`,
+    });
+  });
 
   it("saves a description posted from the page, and deleting lands on the list with a notice", async () => {
     const asset = await apiUpload("notes.pdf", "application/pdf", "%PDF-1.4");

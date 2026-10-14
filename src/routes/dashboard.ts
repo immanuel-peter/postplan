@@ -268,7 +268,7 @@ function assetReferenceData(asset: AssetRecord, url: string) {
   const kind = assetKindFromContentType(asset.contentType);
   const label = escapeHtml(altSource);
   const src = escapeHtml(url);
-  const markdownLabel = altSource.replace(/[\\`*_[\]<>]/g, "\\$&");
+  const markdownLabel = altSource.replace(/[\\`*_[\]<>&]/g, "\\$&");
   let html: string;
   if (kind === "image") {
     html = `<img src="${src}" alt="${label}">`;
