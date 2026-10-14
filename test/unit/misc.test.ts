@@ -70,10 +70,16 @@ describe("asset helpers", () => {
     assert.equal(extensionOf(null), undefined);
   });
 
-  it("prefers a valid mimetype, then the extension, then octet-stream", () => {
+  it("prefers a specific mimetype, then the extension, then octet-stream", () => {
     assert.equal(contentTypeForUpload("image/png; charset=binary", "x.bin"), "image/png");
     assert.equal(contentTypeForUpload("garbage", "x.svg"), "image/svg+xml");
     assert.equal(contentTypeForUpload(undefined, "x.unknown"), "application/octet-stream");
+    assert.equal(contentTypeForUpload("text/plain", "x.csv"), "text/plain");
+    assert.equal(contentTypeForUpload("application/octet-stream", "x.MP4"), "video/mp4");
+    assert.equal(contentTypeForUpload("Application/Octet-Stream; charset=binary", "x.mp3"), "audio/mpeg");
+    assert.equal(contentTypeForUpload("application/octet-stream", "x.csv"), "text/csv");
+    assert.equal(contentTypeForUpload("application/octet-stream", "x.unknown"), "application/octet-stream");
+    assert.equal(contentTypeForUpload("application/octet-stream", null), "application/octet-stream");
   });
 
   it("parses the id out of an asset path", () => {

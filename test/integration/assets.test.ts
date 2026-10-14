@@ -91,9 +91,39 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(gone.statusCode, 404);
   });
 
+  it("infers common file types from generic uploads and serves the stored type", async () => {
+    for (const [filename, expectedType] of [
+      ["clip.mp4", "video/mp4"],
+      ["sound.mp3", "audio/mpeg"],
+      ["data.csv", "text/csv"],
+      ["unknown.bin", "application/octet-stream"],
+    ] as const) {
+      const bytes = Buffer.from(`content for ${filename}`);
+      const created = await upload(filename, "application/octet-stream", bytes);
+      assert.equal(created.statusCode, 201, created.body);
+      const asset = created.json<AssetBody>();
+      assert.equal(asset.contentType, expectedType, filename);
+
+      const read = await t.app.inject({
+        method: "GET", url: `/api/v1/assets/${asset.id}`, headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(read.statusCode, 200, read.body);
+      assert.equal(read.json<AssetBody>().contentType, expectedType, filename);
+
+      const served = await t.app.inject({
+        method: "GET", url: new URL(asset.url).pathname, headers: assetsHost(),
+      });
+      assert.equal(served.statusCode, 200);
+      assert.equal(served.headers["content-type"], expectedType, filename);
+      assert.deepEqual(served.rawPayload, bytes);
+      assert.equal(served.headers["x-content-type-options"], "nosniff");
+    }
+  });
+
   it("refuses HTML and JavaScript by type or extension", async () => {
     for (const [name, type] of [
       ["page.html", "text/html"],
+      ["page.html", "application/octet-stream"],
       ["page.txt", "text/html; charset=utf-8"],
       ["script.js", "text/plain"],
       ["module.mjs", "application/octet-stream"],
