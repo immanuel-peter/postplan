@@ -18,6 +18,7 @@ import {
   deleteAsset,
   formatBytes,
   getAsset,
+  getAssetNeighbors,
   listAssets,
   MAX_ASSET_BYTES,
   normalizeAssetDescription,
@@ -557,10 +558,19 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     const description = asset.description?.trim() || "";
     const altSource = description || base;
     const previewUrl = deps.assetUrls.publicUrl(asset.id, asset.filename);
+    const neighbors = await getAssetNeighbors(deps.db, asset);
+    const pagerLink = (neighbor: (typeof neighbors)["previous"]) =>
+      neighbor ? { href: `/assets/${neighbor.id}`, name: assetDisplayName(neighbor.filename) } : null;
     return reply.view("assets/detail", {
       title: filename,
       active: "assets",
       csrf: request.adminCsrf,
+      pager: {
+        position: neighbors.position,
+        total: neighbors.total,
+        previous: pagerLink(neighbors.previous),
+        next: pagerLink(neighbors.next),
+      },
       asset: {
         id: asset.id,
         filename,

@@ -12,6 +12,7 @@ Immutable binary blobs (images, video, PDFs, SVG, JSON) with a stable public URL
 - Description via API: `PATCH /api/v1/assets/{id}` (JSON `{"description": "..."}`)
 - Description in place on `/assets/{id}`: click `button#desc-display` ("Edit description"), type into `input#description` (counter `#desc-count` "/ 125", max 2000), press Enter to save or Escape to cancel; blur also saves. It saves via `fetch` POST to `form#desc-form`'s action without a page load. `#desc-status` shows "Saved" or the error, and `#desc-text`, the preview `alt`, and the Markdown/HTML snippets update live.
 - Detail page: `h1.asset-title` (filename), Open button, `a#asset-url` + `button[data-copy="asset-url"]`, `img#asset-preview` for images, **Reference** section (`h2#reference-title`) with `code.ref-value[data-snippet="markdown"|"html"|…]` and `button[data-copy]` copy buttons, **Details** table (`table.details-table`)
+- Step between assets on `/assets/{id}`: with two or more Assets, `nav#asset-pager` sits on the back-link row (`.crumb-row`) with `a#pager-prev[rel="prev"]` (the row above in the list, uploaded after this one), `a#pager-next[rel="next"]` (the row below), and `.pager-count` ("3 of 11"). At either end that arrow is a `span#pager-prev-end` / `#pager-next-end` with no link. ← and → follow the links with `location.replace`, so `history.length` does not grow and Back goes straight to `/assets`. Keys are ignored with Alt/Ctrl/Meta/Shift, while `input#description` has focus, while a `<video>` or `<audio>` has focus (Esc blurs it), and while `#delete-dialog` is open. At an end the key does nothing: `#pager-status` reads "This is the first asset" or "This is the last asset" and the end arrow gets `.is-bump`. `#pager-hint` ("← → to browse") shows until the first arrow press (`localStorage` key `postplan.assetKeysUsed`).
 - Delete via API: `DELETE /api/v1/assets/{id}` → 204
 - Delete in dashboard: `form#delete-form` → `<dialog id="delete-dialog">` → `button[data-confirm]` ("Delete asset"; `[data-cancel]` cancels) → redirect `/assets?deleted=1` with flash `p.flash` "Asset deleted." Afterwards the public URL → 404.
 
@@ -42,8 +43,16 @@ Dashboard (after unlocking per SKILL.md):
 4. Click `#desc-display`, type into `#description`, press Enter → `#desc-status` reads "Saved" and `code[data-snippet="markdown"]` contains the new alt text → screenshot `27-described.png`. Confirm with `$S/req.sh "$RUN" 28-after-describe GET /api/v1/assets/<id>`.
 5. To check delete: click `#delete-form button[type="submit"]`, screenshot the open `#delete-dialog`, click `button[data-confirm]` → `/assets?deleted=1` with the flash → screenshot. The asset URL → 404. Remove that id from `created.tsv`, or let cleanup's DELETE return 404.
 
+Stepping (needs a few Assets; upload them with explicit types, e.g. `-F "file=@clip.mp4;type=video/mp4"`):
+
+1. `browser_navigate` `/assets/<id of a middle row>` → `.pager-count` reads "n of N" and both pager links have an `href`.
+2. `browser_press_key` `ArrowRight` → the URL becomes the `#pager-next` href and the count goes up by one; `ArrowLeft` goes back. `history.length` stays the same, and `browser_navigate_back` lands on `/assets`.
+3. On the newest Asset press `ArrowLeft` (on the oldest, `ArrowRight`): the URL does not change and `#pager-status` has the end message.
+4. Click `#desc-display` and press `ArrowLeft`: the caret moves and the page stays put. Focus a `<video>` (`document.querySelector("video").focus()`) and press `ArrowRight`: `currentTime` moves and the page stays put; `Escape`, then `ArrowRight`, steps.
+
 ## Gotchas
 
 - `url` in the API response is the asset host URL with extension. The bare `/{id}` works too.
 - SVGs are served with a sandboxing CSP (`ASSET_DOCUMENT_CSP`). Check that header when `src/lib/csp.ts` changes.
 - The upload posts `_csrf` inside its multipart body. That is the one path `admin-guard.ts` exempts from the normal CSRF hook. Changes to `src/lib/admin-guard.ts` or `src/lib/multipart.ts` need the dashboard upload driven, not just the API.
+- Headless Chrome reports `pointer: none`, so the touch rules (`pointer: coarse`: 40px pager targets and no key hint) do not apply there. A device preset alone does not flip it. Use mobile and touch emulation (CDP `Emulation.setDeviceMetricsOverride` with `mobile: true` plus `Emulation.setTouchEmulationEnabled`) to check them. Clear `localStorage` to see the key hint again after a key press.

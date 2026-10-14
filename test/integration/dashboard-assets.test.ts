@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { eq, ne } from "drizzle-orm";
+import { assets } from "../../src/db/schema.js";
 import { hashToken } from "../../src/lib/tokens.js";
 import { authenticateSession, createSession } from "../../src/services/admin.js";
+import { getAsset, getAssetNeighbors, type AssetRecord } from "../../src/services/assets.js";
 import { apiHost, auth, multipart, skipWithoutDb, startTestApp, type TestApp } from "../helpers/app.js";
 
 // Same production-style origin and cookie as dashboard-guard.test.ts.
@@ -215,5 +218,102 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     const list = await page("/assets?deleted=1");
     assert.match(list, /<p class="flash" role="status">Asset deleted\.<\/p>/);
     assert.doesNotMatch(list, /notes\.pdf/);
+  });
+
+  describe("stepping between assets", () => {
+    type Seeded = { id: string; filename: string | null };
+
+    /** Four assets in a known order: two share a timestamp so the id tie-break is exercised. */
+    async function seedFour(): Promise<{ newest: Seeded[]; byName: Record<string, Seeded> }> {
+      await t.db.delete(assets);
+      const oldest = await apiUpload("oldest.png", "image/png", "1");
+      const middle = await apiUpload("fish & chips.png", "image/png", "2");
+      const tieA = await apiUpload("tie-a.png", "image/png", "3");
+      const tieB = await apiUpload("tie-b.png", "image/png", "4");
+      const stamp = (iso: string) => ({ createdAt: new Date(iso) });
+      await t.db.update(assets).set(stamp("2026-01-01T00:00:00.000Z")).where(eq(assets.id, oldest.id));
+      await t.db.update(assets).set(stamp("2026-01-02T00:00:00.000Z")).where(eq(assets.id, middle.id));
+      await t.db.update(assets).set(stamp("2026-01-03T00:00:00.000Z")).where(eq(assets.id, tieA.id));
+      await t.db.update(assets).set(stamp("2026-01-03T00:00:00.000Z")).where(eq(assets.id, tieB.id));
+      // Same timestamp: the larger id counts as newer, so it sits higher in the list.
+      const tieHigh = tieA.id > tieB.id ? tieA : tieB;
+      const tieLow = tieHigh === tieA ? tieB : tieA;
+      return {
+        newest: [tieHigh, tieLow, middle, oldest],
+        byName: { oldest, middle, tieA, tieB },
+      };
+    }
+
+    it("shows the position and links to the assets above and below in the list", async () => {
+      const { newest } = await seedFour();
+      const [first, second, third, last] = newest as [Seeded, Seeded, Seeded, Seeded];
+
+      const mid = await page(`/assets/${second.id}`);
+      assert.match(mid, /<div class="crumb-row has-pager">\s*<a class="back" href="\/assets">← Assets<\/a>/);
+      assert.match(mid, /<nav class="crumb-pager" id="asset-pager" aria-label="Browse assets">/);
+      assert.match(mid, /<span class="pager-count"><b>2<\/b> of 4<\/span>/);
+      // Previous is the row above (newer), next the row below (older).
+      assert.ok(
+        mid.includes(`id="pager-prev" rel="prev" href="/assets/${first.id}" aria-label="Previous asset: ${first.filename}"`),
+      );
+      assert.ok(
+        mid.includes(`id="pager-next" rel="next" href="/assets/${third.id}" aria-label="Next asset: ${third.filename?.replace("&", "&amp;")}"`),
+      );
+      assert.match(mid, /aria-keyshortcuts="ArrowLeft" title="Previous asset \(←\)"/);
+      assert.match(mid, /aria-keyshortcuts="ArrowRight" title="Next asset \(→\)"/);
+      assert.match(mid, /<span class="pager-hint" id="pager-hint" hidden>/, "the key hint stays hidden until the script decides to show it");
+      assert.match(mid, /<p class="sr-only" id="pager-status" role="status" aria-live="polite"><\/p>/);
+
+      const newestPage = await page(`/assets/${first.id}`);
+      assert.match(newestPage, /<span class="pager-count"><b>1<\/b> of 4<\/span>/);
+      assert.doesNotMatch(newestPage, /id="pager-prev"/, "the newest asset has nothing above it");
+      assert.match(newestPage, /<span class="pager-btn is-disabled" id="pager-prev-end" aria-hidden="true" title="First asset">/);
+      assert.ok(newestPage.includes(`id="pager-next" rel="next" href="/assets/${second.id}"`));
+
+      const oldestPage = await page(`/assets/${last.id}`);
+      assert.match(oldestPage, /<span class="pager-count"><b>4<\/b> of 4<\/span>/);
+      assert.doesNotMatch(oldestPage, /id="pager-next"/, "the oldest asset has nothing below it");
+      assert.match(oldestPage, /<span class="pager-btn is-disabled" id="pager-next-end" aria-hidden="true" title="Last asset">/);
+      assert.ok(oldestPage.includes(`id="pager-prev" rel="prev" href="/assets/${third.id}"`));
+    });
+
+    it("follows the same newest-first order as the Assets list", async () => {
+      const { newest } = await seedFour();
+      const list = await page();
+      const listed = [...list.matchAll(/<a class="asset-filename" href="\/assets\/([^"]+)"/g)].map((m) => m[1]);
+      assert.deepEqual(listed, newest.map((a) => a.id));
+
+      // Walking "next" from the top visits every row once, in list order.
+      const walked: string[] = [];
+      let id: string | undefined = newest[0]?.id;
+      while (id) {
+        walked.push(id);
+        const html = await page(`/assets/${id}`);
+        id = html.match(/id="pager-next" rel="next" href="\/assets\/([^"]+)"/)?.[1];
+      }
+      assert.deepEqual(walked, listed);
+    });
+
+    it("breaks created_at ties by id and reports the position", async () => {
+      const { newest } = await seedFour();
+      const rows = await Promise.all(newest.map((a) => getAsset(t.db, a.id)));
+      const records = rows as AssetRecord[];
+      const seen = await Promise.all(records.map((r) => getAssetNeighbors(t.db, r)));
+      assert.deepEqual(seen.map((n) => n.position), [1, 2, 3, 4]);
+      assert.ok(seen.every((n) => n.total === 4));
+      assert.deepEqual(seen.map((n) => n.previous?.id ?? null), [null, newest[0]?.id, newest[1]?.id, newest[2]?.id]);
+      assert.deepEqual(seen.map((n) => n.next?.id ?? null), [newest[1]?.id, newest[2]?.id, newest[3]?.id, null]);
+    });
+
+    it("hides the pager when there is only one asset", async () => {
+      const { newest } = await seedFour();
+      const keep = newest[1];
+      assert.ok(keep);
+      await t.db.delete(assets).where(ne(assets.id, keep.id));
+
+      const alone = await page(`/assets/${keep.id}`);
+      assert.match(alone, /<div class="crumb-row">\s*<a class="back" href="\/assets">← Assets<\/a>\s*<\/div>/);
+      assert.doesNotMatch(alone, /<nav class="crumb-pager"|id="pager-status"|class="pager-btn/);
+    });
   });
 });
