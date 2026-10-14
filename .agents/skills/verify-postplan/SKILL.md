@@ -5,7 +5,7 @@ description: Drive the local Postplan stack (Fastify app + Postgres + Garage via
 
 # Verify Postplan
 
-One stack, one instance: `compose.yaml` pins `container_name: postplan-*` and fixed host ports, so a second copy cannot run beside it. This stack is also the user's local dev stack. Drive it in place, delete only what your run created, and never run `docker compose down -v` (it wipes their drafts and passkey).
+One stack, one instance: `compose.yaml` pins `container_name: postplan-*` and fixed host ports, so a second copy cannot run beside it. The local stack exists for agents: its dashboard identity is an agent's virtual passkey (below), and agents share it across runs. Drive it in place, delete only what your run created, and never run `docker compose down -v`. That wipes the data and the enrolled passkey, and leaves `.verify/auth/passkey.json` pointing at nothing.
 
 | Host | URL |
 |---|---|
@@ -66,31 +66,39 @@ For row-level side effects, `$S/psql.sh "<select ...>" > "$RUN/<name>.sql.txt"`.
 
 ### Dashboard (Playwright MCP)
 
-The dashboard sits behind a passkey. The agent uses its own virtual passkey (Chrome DevTools WebAuthn virtual authenticator), saved in `.verify/auth/passkey.json` (gitignored). Skip this section entirely when `scope.sh` lists no dashboard feature.
+The dashboard sits behind a passkey. The agent uses its own virtual passkey (Chrome DevTools WebAuthn virtual authenticator), saved in `.verify/auth/passkey.json` (gitignored, mode 600). Skip this section entirely when `scope.sh` lists no dashboard feature.
+
+Never read `.env` secrets or `passkey.json` into your own context. `browser_run_code_unsafe` echoes snippet code into the transcript. So the helpers below write one-shot snippets that fetch the secret or key from a `127.0.0.1` server at runtime (`scripts/oneshot.mjs`, one request, 60 s timeout). Run each generated snippet within 60 s, then delete it.
 
 **Unlock with the saved passkey** (doctor says "saved agent passkey present"):
 
-1. `$S/passkey-restore.sh`. It prints `.verify/auth/restore-passkey.js`.
-2. `browser_navigate` → `http://postplan.localhost:3005/unlock`
-3. `browser_run_code_unsafe` with `filename: ".verify/auth/restore-passkey.js"` → `{restored: 1}`
-4. `browser_click` target `#unlock`. The page redirects to `/` ("My drafts"). The virtual authenticator answers instantly, with no OS prompt.
+1. `browser_navigate` → `http://postplan.localhost:3005/unlock`. If it lands on `/` instead, the browser still has a session: skip to driving.
+2. `$S/passkey-restore.sh`, then `browser_run_code_unsafe` with `filename: ".verify/auth/restore-passkey.js"` → `{restored: 1}`
+3. `browser_click` target `#unlock`. The page redirects to `/` (`h1` "Drafts"). The virtual authenticator answers instantly, with no OS prompt.
+4. `rm .verify/auth/restore-passkey.js`
 
-If unlock shows `#unlock-error`, the saved credential is no longer enrolled. Fall through to enrollment.
+If unlock shows `#unlock-error`, the saved credential is no longer enrolled (doctor will show none or other names). Fall through to enrollment.
 
 **Enroll an agent passkey (no saved passkey, or it stopped working):**
 
-Enrolling through `/setup` in recovery mode uses `ADMIN_RECOVERY_SECRET` from `.env`. Recovery deletes every enrolled passkey (including the user's own) and signs out every session, and each secret works once. So **ask the user before doing it**, every time. If they decline, verify the API-side behavior and report the dashboard part as not driven.
+Doctor's last line says which path applies:
 
-1. `browser_navigate` → `http://postplan.localhost:3005/setup`. The page must say "Recover access", or "Set up PostPlan" on a fresh DB (uses `ADMIN_SETUP_SECRET`, wipes nothing). If it redirects to `/unlock`, the recovery secret is spent: stop and ask the user to rotate `ADMIN_RECOVERY_SECRET` in `.env`, then rerun `launch.sh`.
+- **"first-run setup open"** (fresh or wiped DB): enroll through setup. This is the normal path. The agent owns the local dashboard.
+- **"recovery secret unused"**: enroll through recovery. Recovery deletes every enrolled passkey and session. Doctor lists the enrolled names: if all of them are `verify-postplan agent`, go ahead. If any other name is listed, a human enrolled it. Ask the user before recovering, because it removes theirs.
+- **"no setup/recovery available"**: the recovery secret is spent. Ask the user to rotate `ADMIN_RECOVERY_SECRET` in `.env`, then rerun `launch.sh`. Until then, verify the API side and report the dashboard part as not driven.
+
+Steps (same for setup and recovery; `<mode>` is `setup` or `recovery`):
+
+1. `browser_navigate` → `http://postplan.localhost:3005/setup`. Expect "Set up PostPlan" or "Recover access", matching doctor.
 2. `browser_run_code_unsafe` with `filename: ".agents/skills/verify-postplan/playwright/attach-authenticator.js"`
-3. Fill `#secret` with the secret from `.env`, then submit. Keep secret values out of evidence files and reports.
-4. On the enroll page, set `#device` to `verify-postplan agent`, click `#enroll`. It lands on `/`.
-5. `browser_run_code_unsafe` with `filename: ".agents/skills/verify-postplan/playwright/export-passkey.js"`. Write the returned JSON string verbatim to `.verify/auth/passkey.json` (`mkdir -p .verify/auth` first).
-6. In the report, tell the user their own passkey was replaced and the recovery secret is now spent.
+3. `$S/secret-fill.sh <mode>`, then `browser_run_code_unsafe` with `filename: ".verify/auth/fill-secret.js"` → title "Add your passkey · PostPlan". Then `rm .verify/auth/fill-secret.js`.
+4. `browser_run_code_unsafe` with code `async (page) => { await page.locator('#device').fill('verify-postplan agent'); await page.locator('#enroll').click(); await page.waitForURL((u) => !u.pathname.startsWith('/setup')); return page.url(); }`. The name must be exact: doctor and future agents rely on it. Lands on `/`.
+5. `$S/passkey-save.sh`, then `browser_run_code_unsafe` with `filename: ".verify/auth/save-passkey.js"` → `{saved: 1}`. That writes `.verify/auth/passkey.json`, replacing any stale file. Then `rm .verify/auth/save-passkey.js`.
+6. If you used recovery, say so in the report.
 
-The CDP session lives on the Playwright page. After `browser_close`, or if you open a new tab, restore again before unlocking. Expect to unlock once per run.
+The CDP session lives on the Playwright page. After `browser_close`, or in a new tab, restore again before the next unlock. Session cookies outlive the page, so a later navigation may already be unlocked.
 
-**Driving pages:** prefer form actions and ids from the Eta views over text and coordinates. Nav: `a[href="/"]`, `a[href="/assets"]`, `a[href="/keys"]`, `a[href="/security"]`, `form[action="/lock"] button`. Delete forms use `confirm()`: answer with `browser_handle_dialog accept: true`. Every dashboard POST needs the page's `_csrf` hidden input and a matching `Origin`, so submit the real forms. Never hand-craft dashboard POSTs with curl.
+**Driving pages:** prefer form actions and ids from the Eta views over text and coordinates. Nav: `a[href="/"]`, `a[href="/assets"]`, `a[href="/keys"]`, `a[href="/security"]`, `form[action="/lock"] button`. Confirmations come in two kinds. Draft delete uses native `confirm()`: answer with `browser_handle_dialog accept: true`, or inside a `browser_run_code_unsafe` snippet register `page.once('dialog', (d) => d.accept())` before the click. The tool still prints a "Modal state" note; check the result, not the note. Asset delete and token revoke open an in-page `<dialog>`: wait for `#delete-dialog` / `#revoke-dialog`, screenshot it, click its `button[data-confirm]`. Multi-step flows are fastest as one `browser_run_code_unsafe` snippet that returns the observed state as JSON and saves screenshots with `page.screenshot({ path: '<RUN relative to repo>/NN-<what>.png' })`. Never return secret values (e.g. `#new-secret` text) from a snippet: return a shape check instead (`startsWith('pp_')`, length). Every dashboard POST needs the page's `_csrf` hidden input and a matching `Origin`, so submit the real forms. Never hand-craft dashboard POSTs with curl.
 
 ## 5. Evidence
 
@@ -132,7 +140,7 @@ $S/cleanup.sh "$RUN"
 browser_close   # if you used the dashboard
 ```
 
-It DELETEs each id in `created.tsv` through the API. Drafts are soft-deleted (`status='deleted'`, 404 publicly); the row stays until purge, which is expected. Record ids of anything you created through the dashboard UI in `created.tsv` yourself (`printf 'draft\t<id>\n' >> "$RUN/created.tsv"`). It stops the stack only if `$RUN/started-stack` exists. It never removes volumes, `.verify/auth/`, or the run dir. Kill nothing by process name.
+It DELETEs each id in `created.tsv` through the API. Drafts are soft-deleted (`status='deleted'`, 404 publicly); the row stays until purge, which is expected. Record ids of anything you created through the dashboard UI in `created.tsv` yourself (`printf 'draft\t<id>\n' >> "$RUN/created.tsv"`). It deletes any leftover one-shot snippets in `.verify/auth/`. It stops the stack only if `$RUN/started-stack` exists. It never removes volumes, `.verify/auth/passkey.json`, or the run dir. Kill nothing by process name.
 
 After a failed attempt, still run `cleanup.sh` on that run dir before retrying.
 
@@ -156,7 +164,9 @@ When the task ends in a pull request, put the visual proof in the PR body. Do it
 | `req.sh <run> <name> <METHOD> <path-or-url> [curl args]` | HTTP call with saved evidence |
 | `psql.sh "<sql>"` | read-only query against the stack's Postgres |
 | `field.sh <file> <key>` | print one field of a saved JSON body (`ID=$($S/field.sh "$RUN/01-create.body" id)`) |
-| `passkey-restore.sh` | generate `.verify/auth/restore-passkey.js` |
+| `secret-fill.sh setup\|recovery` | generate `.verify/auth/fill-secret.js` (fills `#secret` on `/setup` without exposing it) |
+| `passkey-save.sh` | generate `.verify/auth/save-passkey.js` (writes the virtual credential to `passkey.json`) |
+| `passkey-restore.sh` | generate `.verify/auth/restore-passkey.js` (re-attaches the saved credential) |
+| `oneshot.mjs` | the one-request `127.0.0.1` hop the three generators use; not called directly |
 | `cleanup.sh <run>` | delete created resources, stop the stack if this run started it |
 | `playwright/attach-authenticator.js` | `browser_run_code_unsafe` filename: add a fresh virtual authenticator |
-| `playwright/export-passkey.js` | `browser_run_code_unsafe` filename: return credentials JSON to save |

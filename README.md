@@ -58,7 +58,7 @@ Tests use Node's built-in runner through `tsx` and drive the real app with Fasti
 
 ```bash
 npm test                     # unit tests; Postgres-backed suites are skipped
-TEST_DATABASE_URL=postgres://postplan:postplan-local-dev@localhost:5432/postplan npm test
+TEST_DATABASE_URL=postgres://postplan:postplan-local-dev@localhost:5433/postplan npm test
 ```
 
 With `TEST_DATABASE_URL` set, each integration test file creates, migrates, and drops its own throwaway database, so the role needs `CREATEDB`. CI runs typecheck, build, and the full suite against a Postgres service container.

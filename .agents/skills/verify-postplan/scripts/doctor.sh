@@ -40,7 +40,8 @@ fi
 ME=$(curl -s -o /dev/null -w '%{http_code}' -m 3 -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/me")
 [ "$ME" = 200 ] && ok "bootstrap token accepted by /api/v1/me" || fail "/api/v1/me returned $ME with BOOTSTRAP_TOKEN from .env"
 
-CREDS=$("$(dirname "$0")/psql.sh" "select count(*) from admin_credentials" 2>/dev/null | sed -n '3p' | tr -d ' ')
+NAMES=$(docker compose -f "$REPO/compose.yaml" exec -T postgres psql -U postplan -d postplan -Atc "select string_agg(name, ', ' order by created_at) from admin_credentials" 2>/dev/null)
+CREDS="${NAMES:-none}"
 SETUP=$(curl -s -m 3 -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/setup")
 SETUP_BODY=$(curl -s -m 3 "$BASE/setup")
 case "$SETUP_BODY" in
@@ -49,9 +50,9 @@ case "$SETUP_BODY" in
   *) MODE="no setup/recovery available ($SETUP); rotate ADMIN_RECOVERY_SECRET to re-enroll" ;;
 esac
 if [ -f "$REPO/.verify/auth/passkey.json" ]; then
-  ok "dashboard: $CREDS passkey(s) enrolled; saved agent passkey present; $MODE"
+  ok "dashboard: passkeys enrolled: $CREDS; saved agent passkey present; $MODE"
 else
-  warn "dashboard: $CREDS passkey(s) enrolled; no saved agent passkey; $MODE"
+  warn "dashboard: passkeys enrolled: $CREDS; no saved agent passkey; $MODE"
 fi
 
 [ "$FAILS" -eq 0 ] && echo "doctor: instance is drivable" || { echo "doctor: $FAILS check(s) failed"; exit 1; }

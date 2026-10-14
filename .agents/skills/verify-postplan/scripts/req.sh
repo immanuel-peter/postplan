@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: req.sh <run-dir> <name> <METHOD> <path-or-url> [extra curl args...]
 # Paths starting with /api get the dashboard base URL and the bootstrap bearer token.
-# Saves <name>.headers and <name>.body in the run dir, prints status, key headers, and body.
+# Saves <name>.headers and <name>.body in the run dir, prints status, key headers, and body (token secrets redacted).
 # A 201 from POST /api/v1/{drafts,assets,tokens} is recorded in created.tsv for cleanup.
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
@@ -32,4 +32,5 @@ fi
 
 echo "HTTP $STATUS  $METHOD $URL"
 grep -iE '^(content-type|content-security-policy|etag|location|cache-control):' "$RUN/$NAME.headers" || true
-head -c 1500 "$RUN/$NAME.body"; echo
+# Token secrets stay in the saved body (gitignored) but never reach stdout.
+head -c 1500 "$RUN/$NAME.body" | sed -E 's/pp_[A-Za-z0-9_-]{8,}/pp_[redacted]/g'; echo

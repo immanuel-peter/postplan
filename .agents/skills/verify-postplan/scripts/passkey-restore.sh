@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # Usage: passkey-restore.sh
-# Writes .verify/auth/restore-passkey.js from the saved .verify/auth/passkey.json. Pass the
-# generated file to browser_run_code_unsafe (filename) to re-attach the agent's passkey.
+# Writes .verify/auth/restore-passkey.js: fetches .verify/auth/passkey.json from a one-shot
+# 127.0.0.1 server and adds it to a virtual authenticator on the current page.
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 SAVED="$REPO/.verify/auth/passkey.json"
-[ -f "$SAVED" ] || { echo "no $SAVED; enroll first (SKILL.md, Dashboard session)" >&2; exit 1; }
-OUT="$REPO/.verify/auth/restore-passkey.js"
-{
-  echo "async (page) => {"
-  echo "  const credentials = $(cat "$SAVED");"
-  cat <<'JS'
+[ -f "$SAVED" ] || { echo "no $SAVED; enroll first (SKILL.md, Dashboard)" >&2; exit 1; }
+P="$(oneshot serve-file "$SAVED")"
+cat > "$REPO/.verify/auth/restore-passkey.js" <<JS
+async (page) => {
+  const credentials = await (await page.request.get('http://127.0.0.1:$P/')).json();
   if (!page._ppAuth) {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('WebAuthn.enable');
@@ -29,5 +28,4 @@ OUT="$REPO/.verify/auth/restore-passkey.js"
   return { authenticatorId, restored: credentials.length };
 }
 JS
-} > "$OUT"
-echo "${OUT#"$REPO"/}"
+echo ".verify/auth/restore-passkey.js (run within 60s)"

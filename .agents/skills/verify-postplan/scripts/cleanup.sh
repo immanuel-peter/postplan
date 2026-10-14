@@ -18,6 +18,9 @@ while IFS=$'\t' read -r KIND ID; do
   echo "DELETE $P -> $CODE" | tee -a "$RUN/cleanup.log"
 done < "$RUN/created.tsv"
 
+# Generated one-shot snippets are scratch; passkey.json is kept for the next run.
+rm -f "$REPO"/.verify/auth/{fill-secret,save-passkey,restore-passkey}.js
+
 if [ -f "$RUN/started-stack" ]; then
   docker compose -f "$REPO/compose.yaml" stop | tee -a "$RUN/cleanup.log"
 fi

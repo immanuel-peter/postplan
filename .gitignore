@@ -2,12 +2,16 @@ node_modules/
 dist/
 .env
 .env.local
+!.env.example
 *.log
 .DS_Store
 .verify/
 .playwright-mcp/
 
 .cursor/
-.agents/
+.agents/*
+!.agents/skills/
+!.claude/
+.claude/settings.local.json
 CONTEXT.md
 docs/adr/

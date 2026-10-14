@@ -18,7 +18,9 @@ while read -r f; do
     src/routes/assets-public.ts|src/services/assets.ts|src/services/orphans.ts|src/lib/s3.ts) add assets ;;
     src/views/assets/*) add assets ;;
     src/services/tokens.ts|src/views/tokens/*) add tokens ;;
-    src/routes/dashboard.ts|src/views/drafts/*|src/views/layouts/main.eta|src/public/app.css) add dashboard-drafts ;;
+    src/routes/dashboard.ts|src/views/drafts/*|src/views/layouts/main.eta|src/public/app.css|src/public/localtime.js|src/lib/time.ts) add dashboard-drafts ;;
+    src/lib/request.ts) add publish-and-versions; add public-draft-serving; add assets; add "the dashboard feature whose handler uses the changed helper" ;;
+    test/*|tsconfig.test.json|.github/*) add "none (npm run typecheck + npm test cover it)" ;;
     src/routes/auth.ts|src/lib/admin-*|src/services/admin.ts|src/public/webauthn.js|src/views/auth/*|src/views/layouts/auth.eta) add passkey-auth ;;
     drizzle/*|src/db/*) add "migrations (doctor) + every feature touching the changed tables" ;;
     compose.yaml|Dockerfile|src/config.ts|src/server.ts|src/app.ts|package*.json) add "launch + doctor, then publish-and-versions as a smoke" ;;
