@@ -23,6 +23,7 @@ import {
   MAX_ASSET_BYTES,
   normalizeAssetDescription,
   patchAsset,
+  type AssetRecord,
 } from "../services/assets.js";
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftRecord, VersionRecord } from "../services/types.js";
@@ -254,8 +255,36 @@ function assetDisplayName(filename: string | null | undefined): string {
   return trimmed === "" ? "unnamed" : trimmed;
 }
 
-function escapeAttr(value: string): string {
-  return value.replaceAll('"', "&quot;");
+function escapeHtml(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+// Both the initial page and inline description saves use these references.
+function assetReferenceData(asset: AssetRecord, url: string) {
+  const filename = assetDisplayName(asset.filename);
+  const dot = filename.lastIndexOf(".");
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const altSource = asset.description?.trim() || base;
+  const kind = assetKindFromContentType(asset.contentType);
+  const label = escapeHtml(altSource);
+  const src = escapeHtml(url);
+  const markdownLabel = altSource.replace(/[\\`*_[\]<>]/g, "\\$&");
+  let html: string;
+  if (kind === "image") {
+    html = `<img src="${src}" alt="${label}">`;
+  } else if (kind === "video" || kind === "audio") {
+    html = `<${kind} controls src="${src}" title="${label}"></${kind}>`;
+  } else {
+    html = `<a href="${src}">${label}</a>`;
+  }
+  return {
+    altSource,
+    snippets: {
+      markdown: `${kind === "image" ? "!" : ""}[${markdownLabel}](${url})`,
+      html,
+      curl: `curl -O ${url}`,
+    },
+  };
 }
 
 async function loadActiveDrafts(db: AppDeps["db"]): Promise<DraftRecord[]> {
@@ -553,11 +582,9 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       return reply.code(404).type("text/plain").send("not found");
     }
     const filename = assetDisplayName(asset.filename);
-    const dot = filename.lastIndexOf(".");
-    const base = dot > 0 ? filename.slice(0, dot) : filename;
     const description = asset.description?.trim() || "";
-    const altSource = description || base;
     const previewUrl = deps.assetUrls.publicUrl(asset.id, asset.filename);
+    const references = assetReferenceData(asset, previewUrl);
     const neighbors = await getAssetNeighbors(deps.db, asset);
     const pagerLink = (neighbor: (typeof neighbors)["previous"]) =>
       neighbor ? { href: `/assets/${neighbor.id}`, name: assetDisplayName(neighbor.filename) } : null;
@@ -576,20 +603,15 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         filename,
         description,
         descriptionValue: description,
-        altSource,
+        altSource: references.altSource,
         previewUrl,
         kind: assetKindFromContentType(asset.contentType),
         contentType: asset.contentType,
         sizeLabel: formatBytes(asset.byteSize),
-        altFallback: base,
         uploadedLabel: formatStamp(asset.createdAt),
         uploadedIso: isoStamp(asset.createdAt),
       },
-      snippets: {
-        markdown: `![${altSource}](${previewUrl})`,
-        html: `<img src="${previewUrl}" alt="${escapeAttr(altSource)}">`,
-        curl: `curl -O ${previewUrl}`,
-      },
+      snippets: references.snippets,
     });
   });
 
@@ -608,6 +630,10 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     });
     if (isServiceError(updated)) {
       return reply.code(404).type("text/plain").send("not found");
+    }
+    if (request.headers.accept === "application/json") {
+      const url = deps.assetUrls.publicUrl(updated.id, updated.filename);
+      return reply.send({ description: updated.description ?? "", ...assetReferenceData(updated, url) });
     }
     return reply.redirect(`/assets/${updated.id}`);
   });

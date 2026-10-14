@@ -190,8 +190,6 @@
     var status = document.getElementById("desc-status");
     var message = status.querySelector("[data-msg]");
     var preview = document.getElementById("asset-preview");
-    var url = <%~ JSON.stringify(it.asset.previewUrl) %>;
-    var fallbackAlt = <%~ JSON.stringify(it.asset.altFallback) %>;
     var csrf = form.querySelector('input[name="_csrf"]').value;
     var saved = input.value.trim();
     var saving = false;
@@ -213,15 +211,15 @@
       }
     }
 
-    function render(value) {
-      var alt = value || fallbackAlt;
+    function render(data) {
+      var value = data.description;
       text.textContent = value || "Add a description";
       text.classList.toggle("is-empty", !value);
-      if (preview) preview.alt = alt;
+      if (preview) preview.alt = data.altSource;
       var markdown = document.querySelector('[data-snippet="markdown"]');
       var html = document.querySelector('[data-snippet="html"]');
-      markdown.textContent = "![" + alt + "](" + url + ")";
-      html.textContent = '<img src="' + url + '" alt="' + alt.replaceAll('"', "&quot;") + '">';
+      markdown.textContent = data.snippets.markdown;
+      html.textContent = data.snippets.html;
       markdown.title = markdown.textContent;
       html.title = html.textContent;
     }
@@ -253,14 +251,13 @@
           method: "POST",
           credentials: "same-origin",
           keepalive: true,
-          redirect: "manual",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
           body: new URLSearchParams({ _csrf: csrf, description: value }),
         });
-        // The route answers with a redirect back to this page.
-        if (response.type !== "opaqueredirect" && !response.ok) throw new Error("save failed");
-        saved = value;
-        render(value);
+        if (!response.ok) throw new Error("save failed");
+        var data = await response.json();
+        saved = data.description;
+        render(data);
         close(refocus);
         showStatus("saved", "Saved");
       } catch (err) {
