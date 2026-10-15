@@ -85,6 +85,8 @@ type TokenRow = {
   lastUsedIso: string;
 };
 
+type AssetKind = "image" | "video" | "audio" | "pdf" | "csv" | "other";
+
 type AssetItemRow = {
   id: string;
   filename: string;
@@ -92,8 +94,11 @@ type AssetItemRow = {
   detailUrl: string;
   thumbUrl: string;
   sizeLabel: string;
-  kind: "image" | "video" | "audio" | "pdf" | "other";
+  kind: AssetKind;
   extLabel: string;
+  // The list cuts long names from the stem so the extension stays visible.
+  filenameStem: string;
+  filenameExt: string;
   uploadedLabel: string;
   uploadedIso: string;
 };
@@ -224,8 +229,8 @@ function toVersionRow(version: VersionRecord, versionUrl: string): VersionRow {
   };
 }
 
-function assetKindFromContentType(contentType: string): AssetItemRow["kind"] {
-  const ct = contentType.toLowerCase();
+function assetKindFromContentType(contentType: string): AssetKind {
+  const ct = contentType.split(";")[0]?.trim().toLowerCase() ?? "";
   if (ct.startsWith("image/")) {
     return "image";
   }
@@ -238,16 +243,24 @@ function assetKindFromContentType(contentType: string): AssetItemRow["kind"] {
   if (ct === "application/pdf") {
     return "pdf";
   }
+  if (ct === "text/csv") {
+    return "csv";
+  }
   return "other";
 }
 
-function assetExtLabel(filename: string): string {
-  const base = filename.split("/").pop() ?? filename;
-  const dot = base.lastIndexOf(".");
-  if (dot <= 0 || dot === base.length - 1) {
-    return "";
+// Splits at the last dot of the last path segment. A leading dot (".env") or a
+// trailing one is part of the stem, so those names have no extension.
+function splitFilename(filename: string): { stem: string; ext: string } {
+  const dot = filename.lastIndexOf(".");
+  if (dot <= filename.lastIndexOf("/") + 1 || dot === filename.length - 1) {
+    return { stem: filename, ext: "" };
   }
-  return base.slice(dot + 1).toUpperCase();
+  return { stem: filename.slice(0, dot), ext: filename.slice(dot) };
+}
+
+function assetExtLabel(filename: string): string {
+  return splitFilename(filename).ext.slice(1).toUpperCase();
 }
 
 function assetDisplayName(filename: string | null | undefined): string {
@@ -476,6 +489,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
           break;
         }
         const filename = assetDisplayName(asset.filename);
+        const { stem, ext } = splitFilename(filename);
         totalBytes += asset.byteSize;
         items.push({
           id: asset.id,
@@ -486,6 +500,8 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
           sizeLabel: formatBytes(asset.byteSize),
           kind: assetKindFromContentType(asset.contentType),
           extLabel: assetExtLabel(filename),
+          filenameStem: stem,
+          filenameExt: ext,
           uploadedLabel: formatStamp(asset.createdAt),
           uploadedIso: isoStamp(asset.createdAt),
         });

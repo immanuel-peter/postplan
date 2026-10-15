@@ -1002,14 +1002,24 @@ code {
   min-width: 0;
 }
 
+/* A long name gives way in its stem, so "report.pdf" cuts to "rep….pdf" and keeps its type. */
 .asset-filename {
-  display: block;
+  display: flex;
   overflow: hidden;
   color: var(--text);
   font-family: var(--mono);
   font-size: 0.85rem;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.filename-stem {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filename-ext {
+  flex: none;
 }
 
 .thumb-sm {
