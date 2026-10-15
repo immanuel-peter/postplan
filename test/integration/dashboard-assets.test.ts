@@ -26,10 +26,10 @@ function referenceSnippets(html: string): Snippets {
   return { markdown: text("markdown"), html: text("html"), curl: text("curl") };
 }
 
-/** The <tr> in the assets table whose filename link shows `filename`. */
+/** The <tr> in the assets table whose filename link is titled `filename`. */
 function rowFor(html: string, filename: string): string {
   const rows = html.match(/<tr>[\s\S]*?<\/tr>/g) ?? [];
-  const row = rows.find((r) => r.includes(`class="asset-filename"`) && r.includes(`>${filename}</a>`));
+  const row = rows.find((r) => r.includes(`class="asset-filename"`) && r.includes(` title="${filename}">`));
   assert.ok(row, `no table row for ${filename}`);
   return row;
 }
@@ -98,7 +98,12 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     const row = rowFor(one, "chart.png");
     assert.ok(row.includes(`<a class="thumb-sm" href="/assets/${png.id}" aria-label="Open chart.png">`));
     assert.match(row, /<img src="https:\/\/assets\.postplan\.test\/[^"]+\.png" alt="" loading="lazy" \/>/);
-    assert.ok(row.includes(`<a class="asset-filename" href="/assets/${png.id}" title="chart.png">chart.png</a>`));
+    assert.ok(
+      row.includes(
+        `<a class="asset-filename" href="/assets/${png.id}" title="chart.png"><span class="filename-stem">chart</span><span class="filename-ext">.png</span></a>`,
+      ),
+      "the extension is its own span so a cut name keeps it",
+    );
     assert.ok(
       row.includes(
         `<div class="cell-sub" title="Layer 4 &lt;head 2&gt; &amp; friends">Layer 4 &lt;head 2&gt; &amp; friends</div>`,
@@ -130,13 +135,47 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     const two = await page();
     assert.match(two, /<span class="panel-count">2 files · \d+ B<\/span>/);
     assert.doesNotMatch(two, /file\(s\)/);
-    assert.ok(two.includes(">chart.png</a>"));
+    assert.ok(two.includes(` title="chart.png">`));
 
     const row = rowFor(two, "README");
     assert.match(row, /<span class="thumb-icon">\s*<svg width="18" height="18"/);
+    assert.match(row, /title="README"><span class="filename-stem">README<\/span><\/a>/);
+    assert.doesNotMatch(row, /filename-ext/);
     assert.doesNotMatch(row, /cell-sub/, "no description line when the asset has none");
     assert.doesNotMatch(row, /ext-tag/);
     assert.match(row, /<td class="col-type hide-sm">\s*<span class="muted">—<\/span>/);
+  });
+
+  it("draws a list icon for each kind of file", async () => {
+    const icon = (row: string) => /<span class="thumb-icon">\s*<svg[^>]*>([\s\S]*?)<\/svg>/.exec(row)?.[1] ?? "";
+    const pageIcon = "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z";
+    for (const [filename, contentType, mark, absent] of [
+      ["paper.pdf", "application/pdf", "M8 13h8", null],
+      ["standup.mp3", "audio/mpeg", "M11 5 6 9H2v6h4l5 4V5z", pageIcon],
+      ["signups.csv", "text/csv; charset=utf-8", "M9 3v18", pageIcon],
+      ["notes.txt", "text/plain", pageIcon, "M8 13h8"],
+    ] as const) {
+      await apiUpload(filename, contentType, "content");
+      const svg = icon(rowFor(await page(), filename));
+      assert.ok(svg.includes(`d="${mark}"`), `${filename} icon`);
+      if (absent) {
+        assert.ok(!svg.includes(`d="${absent}"`), `${filename} icon is not the ${absent === pageIcon ? "page" : "PDF"} icon`);
+      }
+    }
+  });
+
+  it("splits a filename at the last dot of its last segment", async () => {
+    for (const [filename, stem, ext] of [
+      ["Screenshot 2026-10-14 at 6.18.35 AM.png", "Screenshot 2026-10-14 at 6.18.35 AM", ".png"],
+      ["backup.tar.gz", "backup.tar", ".gz"],
+      [".env", ".env", null],
+      ["trailing.", "trailing.", null],
+    ] as const) {
+      await apiUpload(filename, "text/plain", "content");
+      const row = rowFor(await page(), filename);
+      const name = `<span class="filename-stem">${stem}</span>${ext === null ? "" : `<span class="filename-ext">${ext}</span>`}</a>`;
+      assert.ok(row.includes(` title="${filename}">${name}`), filename);
+    }
   });
 
   it("infers generic dashboard uploads and renders video and audio previews", async () => {
