@@ -601,6 +601,8 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     const description = asset.description?.trim() || "";
     const previewUrl = deps.assetUrls.publicUrl(asset.id, asset.filename);
     const references = assetReferenceData(asset, previewUrl);
+    const downloadUrl = new URL(previewUrl);
+    downloadUrl.searchParams.set("download", "1");
     const neighbors = await getAssetNeighbors(deps.db, asset);
     const pagerLink = (neighbor: (typeof neighbors)["previous"]) =>
       neighbor ? { href: `/assets/${neighbor.id}`, name: assetDisplayName(neighbor.filename) } : null;
@@ -621,7 +623,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         descriptionValue: description,
         altSource: references.altSource,
         previewUrl,
-        downloadUrl: `${previewUrl}?download=1`,
+        downloadUrl: downloadUrl.href,
         kind: assetKindFromContentType(asset.contentType),
         contentType: asset.contentType,
         sizeLabel: formatBytes(asset.byteSize),

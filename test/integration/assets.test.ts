@@ -78,6 +78,16 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(ranged.body, "234");
     assert.equal(ranged.headers["content-range"], "bytes 2-4/10");
 
+    const rangedDownload = await t.app.inject({
+      method: "GET",
+      url: `${path}?download=1`,
+      headers: { ...assetsHost(), range: "bytes=2-4" },
+    });
+    assert.equal(rangedDownload.statusCode, 206);
+    assert.equal(rangedDownload.body, "234");
+    assert.equal(rangedDownload.headers["content-range"], "bytes 2-4/10");
+    assert.equal(rangedDownload.headers["content-disposition"], 'attachment; filename="digits.txt"');
+
     const suffix = await t.app.inject({ method: "GET", url: path, headers: { ...assetsHost(), range: "bytes=-3" } });
     assert.equal(suffix.statusCode, 206);
     assert.equal(suffix.body, "789");
@@ -176,6 +186,11 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(
       served.headers["content-disposition"],
       "inline; filename=\"r_sum_.pdf\"; filename*=UTF-8''r%C3%A9sum%C3%A9.pdf",
+    );
+    const download = await t.app.inject({ method: "GET", url: `/${asset.id}.pdf?download=1`, headers: assetsHost() });
+    assert.equal(
+      download.headers["content-disposition"],
+      "attachment; filename=\"r_sum_.pdf\"; filename*=UTF-8''r%C3%A9sum%C3%A9.pdf",
     );
   });
 
