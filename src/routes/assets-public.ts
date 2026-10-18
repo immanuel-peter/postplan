@@ -11,6 +11,12 @@ type AssetParams = {
   id: string;
 };
 
+type AssetQuery = {
+  download?: unknown;
+};
+
+type Disposition = "inline" | "attachment";
+
 function assetsHostConstraint(baseDomain: string): RegExp {
   const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^assets\\.${escaped}(?::\\d+)?$`, "i");
@@ -23,7 +29,7 @@ function encodeRfc5987(value: string): string {
   );
 }
 
-function contentDisposition(filename: string | null): string {
+function contentDisposition(filename: string | null, disposition: Disposition): string {
   const original = filename && filename.length > 0 ? filename : "file";
   let ascii = "";
   let hasNonAscii = false;
@@ -45,9 +51,9 @@ function contentDisposition(filename: string | null): string {
     ascii = "file";
   }
   if (!hasNonAscii) {
-    return `inline; filename="${ascii}"`;
+    return `${disposition}; filename="${ascii}"`;
   }
-  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeRfc5987(original)}`;
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeRfc5987(original)}`;
 }
 
 function parseRangeHeader(
@@ -96,11 +102,12 @@ function applyAssetHeaders(
   record: AssetRecord,
   etag: string,
   contentLength: number,
+  disposition: Disposition,
 ): void {
   reply
     .header("Content-Type", record.contentType)
     .header("Content-Length", String(contentLength))
-    .header("Content-Disposition", contentDisposition(record.filename))
+    .header("Content-Disposition", contentDisposition(record.filename, disposition))
     .header("Cache-Control", CURRENT_CACHE_CONTROL)
     .header("ETag", etag)
     .header("Accept-Ranges", "bytes")
@@ -115,7 +122,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
   const assetsHost = assetsHostConstraint(deps.config.baseDomain);
   const assetsOnly = { constraints: { host: assetsHost } };
 
-  app.get<{ Params: AssetParams }>("/:id", assetsOnly, async (request, reply) => {
+  app.get<{ Params: AssetParams; Querystring: AssetQuery }>("/:id", assetsOnly, async (request, reply) => {
     if (request.hostKind.kind !== "assets") {
       reply.code(404).type("text/plain").send("not found");
       return;
@@ -131,6 +138,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
       return;
     }
 
+    const disposition: Disposition = request.query.download === "1" ? "attachment" : "inline";
     const etag = `"${record.sha256}"`;
     if (matchesEtag(request.headers["if-none-match"], etag)) {
       reply.header("ETag", etag).header("Cache-Control", CURRENT_CACHE_CONTROL).code(304).send();
@@ -152,7 +160,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
         bucket: deps.config.s3Bucket,
         objectKey: record.objectKey,
       });
-      applyAssetHeaders(reply, record, etag, result.contentLength);
+      applyAssetHeaders(reply, record, etag, result.contentLength, disposition);
       return reply.code(200).send(result.body);
     }
     const result = await getObjectStream({
@@ -161,7 +169,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
       objectKey: record.objectKey,
       range: `bytes=${range.start}-${range.end}`,
     });
-    applyAssetHeaders(reply, record, etag, result.contentLength);
+    applyAssetHeaders(reply, record, etag, result.contentLength, disposition);
     reply.header("Content-Range", `bytes ${range.start}-${range.end}/${record.byteSize}`);
     return reply.code(206).send(result.body);
   });

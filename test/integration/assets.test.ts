@@ -61,6 +61,11 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(served.headers.etag, `"${asset.sha256}"`);
     assert.equal(served.headers["content-disposition"], 'inline; filename="digits.txt"');
 
+    const download = await t.app.inject({ method: "GET", url: `${path}?download=1`, headers: assetsHost() });
+    assert.equal(download.statusCode, 200);
+    assert.equal(download.body, "0123456789");
+    assert.equal(download.headers["content-disposition"], 'attachment; filename="digits.txt"');
+
     const notModified = await t.app.inject({
       method: "GET",
       url: path,

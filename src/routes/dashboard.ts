@@ -621,6 +621,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         descriptionValue: description,
         altSource: references.altSource,
         previewUrl,
+        downloadUrl: `${previewUrl}?download=1`,
         kind: assetKindFromContentType(asset.contentType),
         contentType: asset.contentType,
         sizeLabel: formatBytes(asset.byteSize),
