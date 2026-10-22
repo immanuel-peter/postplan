@@ -6,6 +6,8 @@ Postplan is a web service for publishing HTML documents. Agents send self-contai
 - Draft latest version: `https://{slug}.postplan.domain`
 - Draft specific version: `https://{slug}.postplan.domain/v/{n}`
 
+![Postplan dashboard Drafts list showing titles, repositories, versions and update times](https://assets.postplan.link/01M5JZM8ZW4VR60QT8ZRS18PB7.png)
+
 ## Local development
 
 Start the local stack with Docker Compose:
@@ -78,3 +80,7 @@ Environment and secret settings:
 - Set `TOKEN_PEPPER` to a fixed secret string. Changing this value invalidates all stored tokens.
 - Set `BOOTSTRAP_TOKEN` to a secret value that begins with `pp_`. The system seeds this token only when the token table is empty.
 - Configure `CLOUDFLARE_TUNNEL_TOKEN` and the `GARAGE_*` secrets.
+
+## License
+
+[MIT](LICENSE)
