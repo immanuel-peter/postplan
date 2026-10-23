@@ -6,7 +6,7 @@ Postplan is a web service for publishing HTML documents. Agents send self-contai
 - Draft latest version: `https://{slug}.postplan.domain`
 - Draft specific version: `https://{slug}.postplan.domain/v/{n}`
 
-![Postplan dashboard Drafts list showing titles, repositories, versions and update times](https://assets.postplan.link/01M5JZM8ZW4VR60QT8ZRS18PB7.png)
+![Postplan dashboard Drafts list showing titles, repositories, versions and update times](https://assets.postplan.link/01M5K12WZZMQFNNPHX58XQ6A2Z.png)
 
 ## Local development
 
