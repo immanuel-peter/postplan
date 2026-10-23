@@ -1,6 +1,6 @@
 # Postplan
 
-Single-tenant, self-hosted HTML publishing: a Fastify app that serves self-contained HTML Drafts on wildcard subdomains. Language and decision records: `CONTEXT.md`, `docs/adr/`.
+Single-tenant, self-hosted HTML publishing: a Fastify app that serves self-contained HTML Drafts on wildcard subdomains.
 
 ## Architecture
 

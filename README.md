@@ -6,6 +6,8 @@ Postplan is a web service for publishing HTML documents. Agents send self-contai
 - Draft latest version: `https://{slug}.postplan.domain`
 - Draft specific version: `https://{slug}.postplan.domain/v/{n}`
 
+![Postplan dashboard Drafts list showing titles, repositories, versions and update times](https://assets.postplan.link/01M5K12WZZMQFNNPHX58XQ6A2Z.png)
+
 ## Local development
 
 Start the local stack with Docker Compose:
@@ -65,8 +67,6 @@ With `TEST_DATABASE_URL` set, each integration test file creates, migrates, and 
 
 ## Deployment
 
-Deploy the project stack on Hostess with `hostess.yml`.
-
 Services in the stack:
 - `app`: Node.js and Fastify application server.
 - `database`: Managed PostgreSQL database.
@@ -78,3 +78,11 @@ Environment and secret settings:
 - Set `TOKEN_PEPPER` to a fixed secret string. Changing this value invalidates all stored tokens.
 - Set `BOOTSTRAP_TOKEN` to a secret value that begins with `pp_`. The system seeds this token only when the token table is empty.
 - Configure `CLOUDFLARE_TUNNEL_TOKEN` and the `GARAGE_*` secrets.
+
+## Acknowledgments
+
+Postplan was inspired by [postplan.dev](https://postplan.dev). This uses `curl` as a toolchain instead of `npx`.
+
+## License
+
+[MIT](LICENSE)
