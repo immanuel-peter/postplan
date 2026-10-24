@@ -84,6 +84,7 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     assert.match(html, /<table class="data-table assets-table" id="assets-table">/);
     assert.match(html, /<tr class="empty-row"><td colspan="4">No assets yet\. Drop a file above or upload with curl\.<\/td><\/tr>/);
     assert.doesNotMatch(html, /file\(s\)/);
+    assert.doesNotMatch(html, /data-table-search/, "no search box over an empty table");
     assert.doesNotMatch(html, /assets-grid|asset-card|class="dropzone"/, "old grid and dropzone markup is gone");
   });
 
@@ -94,6 +95,9 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     assert.match(one, /<span class="panel-count">1 file · \d+ B<\/span>/);
     assert.doesNotMatch(one, /file\(s\)/);
     assert.doesNotMatch(one, /<tr class="empty-row">/);
+    assert.match(one, /<input type="search" placeholder="Search assets…" aria-label="Search assets"[^>]* data-table-search="assets-table"/);
+    assert.match(one, /<tr class="empty-row search-empty" hidden><td colspan="4">No assets match your search\.<\/td><\/tr>/);
+    assert.match(one, /<script src="\/static\/table-search\.js" defer><\/script>/);
 
     const row = rowFor(one, "chart.png");
     assert.ok(row.includes(`<a class="thumb-sm" href="/assets/${png.id}" aria-label="Open chart.png">`));
