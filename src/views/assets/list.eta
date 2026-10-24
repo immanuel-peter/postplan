@@ -74,9 +74,15 @@
 <section class="panel" aria-labelledby="all-assets">
   <div class="panel-head">
     <h2 id="all-assets">All assets</h2>
+    <% if (it.items.length > 0) { %>
+      <label class="search-box">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" placeholder="Search assets…" aria-label="Search assets" autocomplete="off" data-table-search="assets-table" data-search-fields=".asset-filename, .cell-sub, .ext-tag" />
+      </label>
+    <% } %>
     <span class="panel-count"><%= it.summary %></span>
   </div>
-  <table class="data-table assets-table">
+  <table class="data-table assets-table" id="assets-table">
     <thead>
       <tr>
         <th scope="col">Name</th>
@@ -89,6 +95,7 @@
       <% if (it.items.length === 0) { %>
         <tr class="empty-row"><td colspan="4">No assets yet. Drop a file above or upload with curl.</td></tr>
       <% } %>
+      <tr class="empty-row search-empty" hidden><td colspan="4">No assets match your search.</td></tr>
       <% for (const item of it.items) { %>
         <tr>
           <td>
@@ -152,3 +159,4 @@
     </tbody>
   </table>
 </section>
+<script src="/static/table-search.js" defer></script>

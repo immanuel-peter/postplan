@@ -15,11 +15,21 @@
   </nav>
 </div>
 <div class="panel">
-  <table class="data-table drafts-table">
+  <table class="data-table drafts-table" id="drafts-table">
     <thead>
       <tr>
         <th scope="col" class="col-star"><span class="sr-only">Favorite</span></th>
-        <th scope="col" class="col-title">Title</th>
+        <th scope="col" class="col-title">
+          <div class="th-search">
+            <span>Title</span>
+            <% if (it.rows.length > 0) { %>
+              <label class="search-box">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input type="search" placeholder="Search drafts…" aria-label="Search drafts" autocomplete="off" data-table-search="drafts-table" data-search-fields=".cell-title, .draft-desc, .repo-text" />
+              </label>
+            <% } %>
+          </div>
+        </th>
         <th scope="col" class="col-repo"><span class="th-label">Repository</span></th>
         <th scope="col" class="col-version hide-md">Version</th>
         <th scope="col" class="col-time hide-xs">Updated</th>
@@ -32,6 +42,7 @@
       <% } else if (it.rows.length === 0) { %>
         <tr class="empty-row"><td colspan="6">No favorites yet. Star a draft to pin it to the top.</td></tr>
       <% } %>
+      <tr class="empty-row search-empty" hidden><td colspan="6">No drafts match your search.</td></tr>
       <% for (const row of it.rows) { %>
         <% const rowClass = [row.isFavorite ? "is-favorite" : "", row.afterFavorites ? "after-favorites" : ""].filter(Boolean).join(" ") %>
         <% const starLabel = row.favorite ? "Remove from favorites" : "Add to favorites" %>
@@ -91,3 +102,4 @@
     </tbody>
   </table>
 </div>
+<script src="/static/table-search.js" defer></script>

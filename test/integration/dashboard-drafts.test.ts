@@ -102,6 +102,7 @@ describe("dashboard drafts list", { skip: skipWithoutDb }, () => {
     assert.match(html, /<h1>Drafts<\/h1>/);
     assert.match(html, /No drafts yet\. Publish one with curl and a Token\./);
     assert.match(html, /<span>All<\/span>\s*<span class="count">0<\/span>/);
+    assert.doesNotMatch(html, /data-table-search/, "no search box over an empty table");
   });
 
   let github: DraftBody;
@@ -210,11 +211,25 @@ describe("dashboard drafts list", { skip: skipWithoutDb }, () => {
     const empty = await page("/?show=favorites");
     assert.deepEqual(listRows(empty), []);
     assert.match(empty, /No favorites yet\. Star a draft to pin it to the top\./);
+    assert.doesNotMatch(empty, /data-table-search/, "no search box over an empty favorites view");
     assert.doesNotMatch(empty, /No drafts yet/);
 
     const all = listRows(await page());
     assert.deepEqual(all.map((row) => row.id), [versioned.id, plain.id, github.id]);
     assert.ok(all.every((row) => row.pressed === "false" && row.classes.length === 0));
+  });
+
+  it("puts a search box over the drafts table and serves its script", async () => {
+    const html = await page();
+    assert.match(html, /<table class="data-table drafts-table" id="drafts-table">/);
+    assert.match(html, /<input type="search" placeholder="Search drafts…" aria-label="Search drafts"[^>]* data-table-search="drafts-table"/);
+    assert.match(html, /<tr class="empty-row search-empty" hidden><td colspan="6">No drafts match your search\.<\/td><\/tr>/);
+    assert.match(html, /<script src="\/static\/table-search\.js" defer><\/script>/);
+
+    const script = await t.app.inject({ method: "GET", url: "/static/table-search.js", headers: apiHost() });
+    assert.equal(script.statusCode, 200);
+    assert.equal(script.headers["content-type"], "text/javascript; charset=utf-8");
+    assert.match(script.body, /data-table-search/);
   });
 
   it("treats any other show value as the full list", async () => {
