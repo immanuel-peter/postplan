@@ -226,6 +226,12 @@ h2 {
   font-weight: 400;
 }
 
+.th-search .search-box input {
+  padding-top: 0.28rem;
+  padding-bottom: 0.28rem;
+  font-size: 0.8125rem;
+}
+
 .panel-body {
   padding: 1.25rem 1.25rem 1.1rem;
 }
