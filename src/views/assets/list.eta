@@ -10,7 +10,7 @@
     <path d="M7 9l5-5 5 5" />
     <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
   </svg>
-  <p class="dropbar-text"><strong>Drop files here</strong> <span class="dropbar-sub">· Images, video, documents — up to 100 MB each</span></p>
+  <p class="dropbar-text"><strong>Drop or paste files here</strong> <span class="dropbar-sub">· Images, video, documents — up to 100 MB each</span></p>
   <button type="button" class="btn btn-secondary" id="browse-files">Browse files</button>
   <input id="file-input" type="file" multiple hidden />
   <p class="assets-error" id="assets-error" role="alert" hidden></p>
@@ -69,6 +69,22 @@
     input.addEventListener("change", function () {
       if (input.files && input.files.length) upload(input.files);
     });
+    function pastedName(file, suffix) {
+      if (file.name && !/^image\.\w+$/.test(file.name)) return file.name;
+      var ext = (file.type.split("/")[1] || "bin").split("+")[0].replace("jpeg", "jpg");
+      var stamp = new Date().toISOString().slice(0, 19).replace("T", "-").replace(/:/g, "");
+      return "pasted-" + stamp + suffix + "." + ext;
+    }
+    document.addEventListener("paste", function (e) {
+      var target = e.target;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      var files = e.clipboardData ? Array.from(e.clipboardData.files) : [];
+      if (!files.length) return;
+      e.preventDefault();
+      upload(files.map(function (file, i) {
+        return new File([file], pastedName(file, files.length > 1 ? "-" + (i + 1) : ""), { type: file.type });
+      }));
+    });
   })();
 </script>
 <section class="panel" aria-labelledby="all-assets">
@@ -93,7 +109,7 @@
     </thead>
     <tbody>
       <% if (it.items.length === 0) { %>
-        <tr class="empty-row"><td colspan="4">No assets yet. Drop a file above or upload with curl.</td></tr>
+        <tr class="empty-row"><td colspan="4">No assets yet. Drop or paste a file above or upload with curl.</td></tr>
       <% } %>
       <tr class="empty-row search-empty" hidden><td colspan="4">No assets match your search.</td></tr>
       <% for (const item of it.items) { %>
