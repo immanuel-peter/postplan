@@ -292,4 +292,78 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     });
     assert.equal(apiOnDraftHost.statusCode, 404, "the API must not answer on draft subdomains");
   });
+
+  it("filters the draft list with q", async () => {
+    async function make(html: string, fields: Record<string, string> = {}) {
+      const res = await createDraft(htmlDoc(html), fields);
+      assert.equal(res.statusCode, 201, res.body);
+      return res.json<DraftBody>();
+    }
+    const keeper = await make("keeper", {
+      title: "Quarterly report",
+      description: "metrics dashboards",
+      repository_name: "postplan",
+    });
+    const other = await make("other", { title: "Notes", description: "meeting minutes" });
+    const percent = await make("percent", { description: "100% done" });
+    const near = await make("near", { description: "1001 notes" });
+    const underscore = await make("underscore", { description: "foo_bar" });
+    const wild = await make("wild", { description: "fooxbar" });
+
+    const ids = async (q: string) => {
+      const res = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/drafts?limit=100&q=${encodeURIComponent(q)}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(res.statusCode, 200, res.body);
+      return new Set(res.json<{ items: DraftBody[] }>().items.map((item) => item.id));
+    };
+
+    assert.deepEqual(await ids("quarterly"), new Set([keeper.id]));
+    assert.deepEqual(await ids("QUARTERLY DASHBOARDS"), new Set([keeper.id]), "case-insensitive, words may match different columns");
+    assert.deepEqual(await ids("postplan"), new Set([keeper.id]), "repository_name is searched");
+    assert.deepEqual(await ids("quarterly minutes"), new Set(), "every word must match");
+    assert.deepEqual(await ids("100%"), new Set([percent.id]), "% is a literal");
+    assert.deepEqual(await ids("1001"), new Set([near.id]));
+    assert.deepEqual(await ids("foo_bar"), new Set([underscore.id]), "_ is a literal");
+
+    const noFilter = await t.app.inject({
+      method: "GET",
+      url: "/api/v1/drafts?limit=100&q=",
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(noFilter.statusCode, 200, noFilter.body);
+    const all = new Set(noFilter.json<{ items: DraftBody[] }>().items.map((item) => item.id));
+    for (const draft of [keeper, other, percent, near, underscore, wild]) {
+      assert.ok(all.has(draft.id));
+    }
+
+    for (let i = 1; i <= 3; i += 1) {
+      const res = await createDraft(htmlDoc(`alpha ${i}`), { title: `Alpha page ${i}` });
+      assert.equal(res.statusCode, 201, res.body);
+    }
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const query: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+      const page = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/drafts?limit=2&q=${encodeURIComponent("alpha page")}${query}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(page.statusCode, 200, page.body);
+      const body = page.json<{ items: DraftBody[]; nextCursor: string | null }>();
+      for (const item of body.items) {
+        assert.ok(!seen.has(item.id), "pages must not overlap");
+        assert.match(item.title ?? "", /^Alpha page/, "only matching drafts are listed");
+        seen.add(item.id);
+      }
+      cursor = body.nextCursor;
+      pages += 1;
+    } while (cursor && pages < 20);
+    assert.equal(seen.size, 3);
+    assert.equal(pages, 2);
+  });
 });

@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, gt, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, lt, or, sql, type Column } from "drizzle-orm";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { Database } from "../db/client.js";
 import { assets } from "../db/schema.js";
 import { sha256Hex } from "../lib/hash.js";
 import { localAssetUrl, publicAssetUrl } from "../lib/host.js";
 import { newId } from "../lib/ids.js";
+import { searchFilter, searchWords } from "../lib/search.js";
 import { assetObjectKey, deleteObject, putBytes } from "../lib/s3.js";
 import { recordOrphan } from "./orphans.js";
 import type { ServiceError } from "./types.js";
@@ -288,6 +289,7 @@ export async function getAsset(db: Database, id: string): Promise<AssetRecord | 
 
 export async function listAssets(input: {
   db: Database;
+  q?: string;
   limit: number;
   cursor?: string | undefined;
 }): Promise<{ items: AssetRecord[]; nextCursor: string | null } | ServiceError> {
@@ -299,10 +301,11 @@ export async function listAssets(input: {
     };
   }
   const cursorFilter = input.cursor ? lt(assets.createdAt, new Date(input.cursor)) : undefined;
+  const qFilter = searchFilter(searchWords(input.q), assetSearchColumns);
   const rows = await input.db
     .select()
     .from(assets)
-    .where(cursorFilter !== undefined ? and(cursorFilter) : undefined)
+    .where(qFilter !== undefined && cursorFilter !== undefined ? and(qFilter, cursorFilter) : qFilter ?? cursorFilter)
     .orderBy(desc(assets.createdAt))
     .limit(input.limit + 1);
 
@@ -313,6 +316,8 @@ export async function listAssets(input: {
     nextCursor: extra ? (page[page.length - 1]?.createdAt.toISOString() ?? null) : null,
   };
 }
+
+const assetSearchColumns: Column[] = [assets.filename, assets.description];
 
 export type AssetNeighbor = { id: string; filename: string | null };
 

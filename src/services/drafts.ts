@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql, type Column } from "drizzle-orm";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { Database } from "../db/client.js";
 import { draftVersions, drafts, idempotencyKeys } from "../db/schema.js";
@@ -9,6 +9,7 @@ import { localDraftUrl, publicDraftUrl } from "../lib/host.js";
 import { newId } from "../lib/ids.js";
 import { versionObjectKey, putHtml } from "../lib/s3.js";
 import { generateSlug, isReservedSlug } from "../lib/slug.js";
+import { searchFilter, searchWords } from "../lib/search.js";
 import { recordOrphan } from "./orphans.js";
 import type { DraftRecord, DraftResponse, DraftStatus, ServiceError, VersionRecord } from "./types.js";
 
@@ -339,6 +340,7 @@ export async function listDrafts(input: {
   db: Database;
   status?: DraftStatus;
   repository?: string;
+  q?: string;
   cursor?: string;
   limit: number;
 }): Promise<{ items: DraftRecord[]; nextCursor: string | null }> {
@@ -351,6 +353,10 @@ export async function listDrafts(input: {
     conditions.push(sql`${drafts.repositoryName} IS NULL`);
   } else if (input.repository) {
     conditions.push(eq(drafts.repositoryName, input.repository));
+  }
+  const qFilter = searchFilter(searchWords(input.q), searchColumns);
+  if (qFilter !== undefined) {
+    conditions.push(qFilter);
   }
   if (input.cursor) {
     conditions.push(lt(drafts.updatedAt, new Date(input.cursor)));
@@ -370,6 +376,8 @@ export async function listDrafts(input: {
     nextCursor: extra ? page[page.length - 1]?.updatedAt.toISOString() ?? null : null,
   };
 }
+
+const searchColumns: Column[] = [drafts.title, drafts.description, drafts.repositoryName];
 
 export async function getDraft(db: Database, id: string): Promise<DraftRecord | ServiceError> {
   const [row] = await db.select().from(drafts).where(eq(drafts.id, id)).limit(1);

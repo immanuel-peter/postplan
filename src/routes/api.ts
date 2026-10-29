@@ -493,6 +493,10 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
             properties: {
               status: { type: "string", enum: ["active", "deleted"] },
               repository: { type: "string" },
+              q: {
+                type: "string",
+                description: "Case-insensitive substring search; every whitespace-separated word must match title, description, or repository_name",
+              },
               cursor: { type: "string" },
               limit: { type: "string" },
             },
@@ -528,12 +532,14 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
         }
 
         const repository = queryField(request.query, "repository");
+        const q = queryField(request.query, "q");
         const cursor = queryField(request.query, "cursor");
         const listed = await listDrafts({
           db: deps.db,
           limit: limitParsed.limit,
           ...(statusParsed.status !== undefined ? { status: statusParsed.status } : {}),
           ...(repository !== undefined ? { repository } : {}),
+          ...(q !== undefined ? { q } : {}),
           ...(cursor !== undefined ? { cursor } : {}),
         });
 
@@ -969,6 +975,10 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           querystring: {
             type: "object",
             properties: {
+              q: {
+                type: "string",
+                description: "Case-insensitive substring search; every whitespace-separated word must match filename or description",
+              },
               cursor: { type: "string" },
               limit: { type: "string" },
             },
@@ -1000,9 +1010,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
         }
 
         const cursor = queryField(request.query, "cursor");
+        const q = queryField(request.query, "q");
         const listed = await listAssets({
           db: deps.db,
           limit: limitParsed.limit,
+          ...(q !== undefined ? { q } : {}),
           ...(cursor !== undefined ? { cursor } : {}),
         });
         if (isServiceError(listed)) {

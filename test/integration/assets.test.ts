@@ -200,4 +200,72 @@ describe("assets", { skip: skipWithoutDb }, () => {
       assert.equal(res.statusCode, 404, url);
     }
   });
+
+  it("filters the asset list with q", async () => {
+    async function make(name: string, data: string, description?: string) {
+      const res = await upload(name, "text/plain", data, description);
+      assert.equal(res.statusCode, 201, res.body);
+      return res.json<AssetBody>();
+    }
+    const chart = await make("chart.png", "png", "quarterly numbers");
+    const notes = await make("notes.txt", "txt");
+    const archive = await make("archive.zip", "zip", "100% packed");
+    const underscore = await make("foo_bar.txt", "ub");
+    const wild = await make("fooxbar.txt", "wild");
+
+    const ids = async (q: string) => {
+      const res = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/assets?limit=100&q=${encodeURIComponent(q)}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(res.statusCode, 200, res.body);
+      return new Set(res.json<{ items: AssetBody[] }>().items.map((item) => item.id));
+    };
+
+    assert.deepEqual(await ids("chart"), new Set([chart.id]), "filename is searched");
+    assert.deepEqual(await ids("QUARTERLY"), new Set([chart.id]), "case-insensitive");
+    assert.deepEqual(await ids("quarterly numbers"), new Set([chart.id]), "words may match different columns");
+    assert.deepEqual(await ids("quarterly packed"), new Set(), "every word must match");
+    assert.deepEqual(await ids("100%"), new Set([archive.id]), "% is a literal");
+    assert.deepEqual(await ids("foo_bar"), new Set([underscore.id]), "_ is a literal");
+
+    const noFilter = await t.app.inject({
+      method: "GET",
+      url: "/api/v1/assets?limit=100&q=",
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(noFilter.statusCode, 200, noFilter.body);
+    const all = new Set(noFilter.json<{ items: AssetBody[] }>().items.map((item) => item.id));
+    for (const asset of [chart, notes, archive, underscore, wild]) {
+      assert.ok(all.has(asset.id));
+    }
+
+    for (let i = 1; i <= 3; i += 1) {
+      const res = await upload(`alpha-${i}.txt`, "text/plain", `alpha ${i}`);
+      assert.equal(res.statusCode, 201, res.body);
+    }
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const query: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+      const page = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/assets?limit=2&q=${encodeURIComponent("alpha")}${query}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(page.statusCode, 200, page.body);
+      const body = page.json<{ items: AssetBody[]; nextCursor: string | null }>();
+      for (const item of body.items) {
+        assert.ok(!seen.has(item.id), "pages must not overlap");
+        assert.match(item.filename ?? "", /^alpha-/, "only matching assets are listed");
+        seen.add(item.id);
+      }
+      cursor = body.nextCursor;
+      pages += 1;
+    } while (cursor && pages < 20);
+    assert.equal(seen.size, 3);
+    assert.equal(pages, 2);
+  });
 });
