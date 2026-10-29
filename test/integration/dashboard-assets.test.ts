@@ -74,11 +74,12 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     const html = await page();
     assert.match(html, /<section class="dropbar" id="dropzone" aria-label="Upload">/);
     assert.match(html, /<svg class="dropbar-icon" width="22" height="22"/);
-    assert.match(html, /<strong>Drop files here<\/strong> <span class="dropbar-sub">/);
+    assert.match(html, /<strong>Drop or paste files here<\/strong> <span class="dropbar-sub">/);
     assert.match(html, /<button type="button" class="btn btn-secondary"[^>]*>Browse files<\/button>/);
     assert.match(html, /<input id="file-input" type="file" multiple hidden \/>/);
     assert.match(html, /id="assets-error"[^>]*hidden/);
     assert.ok(html.includes(JSON.stringify(session.csrf)), "upload script posts the session's CSRF token");
+    assert.match(html, /document\.addEventListener\("paste"/, "pasting a file uploads it");
 
     assert.match(html, /<span class="panel-count">0 files · 0 B<\/span>/);
     assert.match(html, /<table class="data-table assets-table" id="assets-table">/);
