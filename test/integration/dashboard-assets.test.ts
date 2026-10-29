@@ -83,7 +83,7 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
 
     assert.match(html, /<span class="panel-count">0 files · 0 B<\/span>/);
     assert.match(html, /<table class="data-table assets-table" id="assets-table">/);
-    assert.match(html, /<tr class="empty-row"><td colspan="4">No assets yet\. Drop a file above or upload with curl\.<\/td><\/tr>/);
+    assert.match(html, /<tr class="empty-row"><td colspan="4">No assets yet\. Drop or paste a file above or upload with curl\.<\/td><\/tr>/);
     assert.doesNotMatch(html, /file\(s\)/);
     assert.doesNotMatch(html, /data-table-search/, "no search box over an empty table");
     assert.doesNotMatch(html, /assets-grid|asset-card|class="dropzone"/, "old grid and dropzone markup is gone");
