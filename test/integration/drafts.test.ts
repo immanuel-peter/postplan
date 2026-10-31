@@ -241,6 +241,78 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(bad.statusCode, 400);
   });
 
+  it("searches the draft list with ?q=", async () => {
+    const alpha = (
+      await createDraft(htmlDoc("search alpha"), {
+        title: "Quarterly Alpha",
+        description: "launch checklist",
+        repository_name: "acme/corp-site",
+      })
+    ).json<DraftBody>();
+    await createDraft(htmlDoc("search beta"), { title: "Beta Page" });
+    const punct = (await createDraft(htmlDoc("search punct"), { title: "50%_off" })).json<DraftBody>();
+    const slash = (await createDraft(htmlDoc("search slash"), { title: "back\\slash" })).json<DraftBody>();
+
+    async function list(query: string) {
+      const res = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/drafts?${query}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(res.statusCode, 200, res.body);
+      return res.json<{ items: DraftBody[]; nextCursor: string | null }>();
+    }
+    async function ids(query: string) {
+      return (await list(query)).items.map((item) => item.id);
+    }
+
+    assert.deepEqual(await ids("q=alpha"), [alpha.id]);
+    assert.deepEqual(await ids("q=checklist"), [alpha.id], "matches description");
+    assert.deepEqual(await ids("q=corp-site"), [alpha.id], "matches repositoryName");
+
+    assert.deepEqual(await ids("q=quarterly%20alpha"), [alpha.id], "words AND together");
+    assert.deepEqual(await ids("q=quarterly%20beta"), [], "a word matching nothing fails the AND");
+    assert.deepEqual(await ids("q=QUARTERLY"), [alpha.id], "case-insensitive");
+
+    assert.deepEqual(await ids("q=%25"), [punct.id], "% is literal, not a wildcard");
+    assert.deepEqual(await ids("q=50%25_off"), [punct.id], "_ is literal, not a wildcard");
+    assert.deepEqual(await ids("q=back%5Cslash"), [slash.id], "\\ matches a literal backslash");
+
+    const none = await list("q=nosuchword");
+    assert.deepEqual(none.items, []);
+    assert.equal(none.nextCursor, null);
+  });
+
+  it("paginates ?q= results within the filtered set", async () => {
+    for (let i = 0; i < 3; i += 1) {
+      await createDraft(htmlDoc(`wander ${i}`), { title: `Wanderer ${i}` });
+    }
+    await createDraft(htmlDoc("static"), { title: "Static" });
+
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const cursorQuery: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+      const page = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/drafts?q=wander&limit=2${cursorQuery}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(page.statusCode, 200, page.body);
+      const body = page.json<{ items: DraftBody[]; nextCursor: string | null }>();
+      assert.ok(body.items.length <= 2);
+      for (const item of body.items) {
+        assert.match(item.title ?? "", /Wanderer/, "pages must stay inside the ?q= set");
+        assert.ok(!seen.has(item.id), "pages must not overlap");
+        seen.add(item.id);
+      }
+      cursor = body.nextCursor;
+      pages += 1;
+    } while (cursor && pages < 20);
+    assert.equal(seen.size, 3);
+  });
+
   it("lists each draft with its latest version", async () => {
     const multi = (await createDraft(htmlDoc("multi v1"))).json<DraftBody>();
     assert.equal((await addVersion(multi.id, htmlDoc("multi v2"), { "if-match": '"1"' })).statusCode, 201);
@@ -259,6 +331,41 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(multiItem?.currentVersion, 3);
     assert.equal(multiItem?.versionUrl, `https://${multi.slug}.postplan.test/v/3`);
     assert.equal(singleItem?.currentVersion, 1);
+  });
+
+  it("composes ?q= with the status and repository filters", async () => {
+    const combo = (
+      await createDraft(htmlDoc("combo"), { title: "combo ship", repository_name: "acme/combo" })
+    ).json<DraftBody>();
+    const free = (await createDraft(htmlDoc("combo-free"), { title: "form ship" })).json<DraftBody>();
+
+    async function idsFor(url: string) {
+      const res = await t.app.inject({ method: "GET", url, headers: { ...apiHost(), ...auth } });
+      assert.equal(res.statusCode, 200, res.body);
+      return res.json<{ items: DraftBody[] }>().items.map((item) => item.id);
+    }
+
+    assert.deepEqual(
+      await idsFor("/api/v1/drafts?q=ship&repository="),
+      [free.id],
+      "q= plus the is-null repository filter finds only the draft without a repo",
+    );
+    assert.deepEqual(
+      await idsFor("/api/v1/drafts?q=ship&repository=acme/combo"),
+      [combo.id],
+      "q= plus exact repository filter",
+    );
+    assert.deepEqual(await idsFor("/api/v1/drafts?q=ship"), [free.id, combo.id], "unfiltered q= finds both");
+
+    const deleted = await t.app.inject({
+      method: "DELETE",
+      url: `/api/v1/drafts/${combo.id}`,
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(deleted.statusCode, 204);
+    const active = await idsFor("/api/v1/drafts?q=ship");
+    assert.ok(!active.includes(combo.id), "q= respects the default active filter");
+    assert.deepEqual(await idsFor("/api/v1/drafts?q=ship&status=deleted"), [combo.id]);
   });
 
   it("rejects version numbers beyond the safe integer range", async () => {

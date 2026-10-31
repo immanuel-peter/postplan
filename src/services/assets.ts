@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, gt, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, lt, or, sql, type SQL } from "drizzle-orm";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { Database } from "../db/client.js";
 import { assets } from "../db/schema.js";
 import { sha256Hex } from "../lib/hash.js";
 import { localAssetUrl, publicAssetUrl } from "../lib/host.js";
 import { newId } from "../lib/ids.js";
+import { searchConditions } from "../lib/search.js";
 import { assetObjectKey, deleteObject, putBytes } from "../lib/s3.js";
 import { recordOrphan } from "./orphans.js";
 import type { ServiceError } from "./types.js";
@@ -289,6 +290,7 @@ export async function getAsset(db: Database, id: string): Promise<AssetRecord | 
 export async function listAssets(input: {
   db: Database;
   limit: number;
+  query?: string;
   cursor?: string | undefined;
 }): Promise<{ items: AssetRecord[]; nextCursor: string | null } | ServiceError> {
   if (input.cursor !== undefined && Number.isNaN(Date.parse(input.cursor))) {
@@ -298,11 +300,16 @@ export async function listAssets(input: {
       detail: "cursor must be an ISO-8601 timestamp",
     };
   }
-  const cursorFilter = input.cursor ? lt(assets.createdAt, new Date(input.cursor)) : undefined;
+  const conditions: SQL[] = [];
+  if (input.cursor) {
+    conditions.push(lt(assets.createdAt, new Date(input.cursor)));
+  }
+  conditions.push(...searchConditions([assets.filename, assets.description], input.query));
+
   const rows = await input.db
     .select()
     .from(assets)
-    .where(cursorFilter !== undefined ? and(cursorFilter) : undefined)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(assets.createdAt))
     .limit(input.limit + 1);
 
