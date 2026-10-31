@@ -9,6 +9,15 @@ The job is a Draft the user opens in a browser.
 
 `$POSTPLAN_TOKEN` authenticates. Stop if the Token is unset. The live contract is `$POSTPLAN_URL/openapi.json`.
 
+> **Note**: If unset in this shell, probe the login shell once without printing the value. If still unset, stop and ask privately. When the login shell has it, run `curl` under the same `zsh -ic '...'` / `bash -lc '...'` wrapper so the token resolves.
+> ```bash
+> # macOS
+> zsh -ic '[ -n "$POSTPLAN_TOKEN" ] && echo TOKEN_SET'
+> 
+> # Linux
+> bash -lc '[ -n "$POSTPLAN_TOKEN" ] && echo TOKEN_SET'
+> ```
+
 ```bash
 POSTPLAN_URL="https://postplan.domain" // Use your custom domain for your Postplan app
 ```

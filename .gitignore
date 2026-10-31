@@ -2,6 +2,8 @@ node_modules/
 dist/
 .env
 .env.local
+.env.hostess
+.env.preview
 !.env.example
 *.log
 .DS_Store
