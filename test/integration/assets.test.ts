@@ -43,6 +43,35 @@ describe("assets", { skip: skipWithoutDb }, () => {
     });
   }
 
+  it("searches the asset list with ?q=", async () => {
+    const report = (await upload("quarterly-report.pdf", "application/pdf", "numbered pages", "Q3 figures")).json<AssetBody>();
+    const discount = (await upload("50%_off.png", "image/png", "sale banner bytes", "winter deal")).json<AssetBody>();
+    await upload("logo.png", "image/png", "pixel bytes");
+
+    async function ids(query: string) {
+      const res = await t.app.inject({
+        method: "GET",
+        url: `/api/v1/assets?${query}`,
+        headers: { ...apiHost(), ...auth },
+      });
+      assert.equal(res.statusCode, 200, res.body);
+      const body = res.json<{ items: AssetBody[]; nextCursor: string | null }>();
+      return body;
+    }
+
+    assert.deepEqual((await ids("q=quarterly")).items.map((a) => a.id), [report.id], "matches filename");
+    assert.deepEqual((await ids("q=figures")).items.map((a) => a.id), [report.id], "matches description");
+    assert.deepEqual((await ids("q=quarterly%20figures")).items.map((a) => a.id), [report.id], "words AND together");
+    assert.deepEqual((await ids("q=quarterly%20deal")).items, [], "a word matching nothing fails the AND");
+    assert.deepEqual((await ids("q=QUARTERLY")).items.map((a) => a.id), [report.id], "case-insensitive");
+    assert.deepEqual((await ids("q=%25")).items.map((a) => a.id), [discount.id], "% is literal, not a wildcard");
+    assert.deepEqual((await ids("q=quarterly%20numbers")).items, [], "does not search upload bytes");
+
+    const none = await ids("q=nosuchword");
+    assert.deepEqual(none.items, []);
+    assert.equal(none.nextCursor, null);
+  });
+
   it("uploads, serves publicly with CORS, supports ranges, and deletes", async () => {
     const bytes = Buffer.from("0123456789");
     const created = await upload("digits.txt", "text/plain", bytes, "  some digits ");

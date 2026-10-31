@@ -6,6 +6,7 @@ import { SECURITY_POLICY_VERSION } from "../lib/csp.js";
 import { sha256Hex } from "../lib/hash.js";
 import { isHtmlValidationError, validateHtml } from "../lib/html.js";
 import { localDraftUrl, publicDraftUrl } from "../lib/host.js";
+import { searchConditions } from "../lib/search.js";
 import { newId } from "../lib/ids.js";
 import { versionObjectKey, putHtml } from "../lib/s3.js";
 import { generateSlug, isReservedSlug } from "../lib/slug.js";
@@ -339,6 +340,7 @@ export async function listDrafts(input: {
   db: Database;
   status?: DraftStatus;
   repository?: string;
+  query?: string;
   cursor?: string;
   limit: number;
 }): Promise<{ items: DraftRecord[]; nextCursor: string | null }> {
@@ -352,6 +354,7 @@ export async function listDrafts(input: {
   } else if (input.repository) {
     conditions.push(eq(drafts.repositoryName, input.repository));
   }
+  conditions.push(...searchConditions([drafts.title, drafts.description, drafts.repositoryName], input.query));
   if (input.cursor) {
     conditions.push(lt(drafts.updatedAt, new Date(input.cursor)));
   }

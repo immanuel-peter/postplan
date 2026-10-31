@@ -493,6 +493,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
             properties: {
               status: { type: "string", enum: ["active", "deleted"] },
               repository: { type: "string" },
+              q: {
+                type: "string",
+                description:
+                  "Search words, case-insensitive. Split on whitespace; every word must appear in title, description, or repositoryName. % _ \\ match literally.",
+              },
               cursor: { type: "string" },
               limit: { type: "string" },
             },
@@ -528,12 +533,14 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
         }
 
         const repository = queryField(request.query, "repository");
+        const query = queryField(request.query, "q");
         const cursor = queryField(request.query, "cursor");
         const listed = await listDrafts({
           db: deps.db,
           limit: limitParsed.limit,
           ...(statusParsed.status !== undefined ? { status: statusParsed.status } : {}),
           ...(repository !== undefined ? { repository } : {}),
+          ...(query !== undefined ? { query } : {}),
           ...(cursor !== undefined ? { cursor } : {}),
         });
 
@@ -969,6 +976,11 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           querystring: {
             type: "object",
             properties: {
+              q: {
+                type: "string",
+                description:
+                  "Search words, case-insensitive. Split on whitespace; every word must appear in filename or description. % _ \\ match literally.",
+              },
               cursor: { type: "string" },
               limit: { type: "string" },
             },
@@ -999,10 +1011,12 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
           return sendProblem(reply, problem(400, "Bad Request", "limit must be an integer from 1 to 100"));
         }
 
+        const query = queryField(request.query, "q");
         const cursor = queryField(request.query, "cursor");
         const listed = await listAssets({
           db: deps.db,
           limit: limitParsed.limit,
+          ...(query !== undefined ? { query } : {}),
           ...(cursor !== undefined ? { cursor } : {}),
         });
         if (isServiceError(listed)) {
