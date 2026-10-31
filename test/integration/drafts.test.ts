@@ -333,6 +333,41 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(singleItem?.currentVersion, 1);
   });
 
+  it("composes ?q= with the status and repository filters", async () => {
+    const combo = (
+      await createDraft(htmlDoc("combo"), { title: "combo ship", repository_name: "acme/combo" })
+    ).json<DraftBody>();
+    const free = (await createDraft(htmlDoc("combo-free"), { title: "form ship" })).json<DraftBody>();
+
+    async function idsFor(url: string) {
+      const res = await t.app.inject({ method: "GET", url, headers: { ...apiHost(), ...auth } });
+      assert.equal(res.statusCode, 200, res.body);
+      return res.json<{ items: DraftBody[] }>().items.map((item) => item.id);
+    }
+
+    assert.deepEqual(
+      await idsFor("/api/v1/drafts?q=ship&repository="),
+      [free.id],
+      "q= plus the is-null repository filter finds only the draft without a repo",
+    );
+    assert.deepEqual(
+      await idsFor("/api/v1/drafts?q=ship&repository=acme/combo"),
+      [combo.id],
+      "q= plus exact repository filter",
+    );
+    assert.deepEqual(await idsFor("/api/v1/drafts?q=ship"), [free.id, combo.id], "unfiltered q= finds both");
+
+    const deleted = await t.app.inject({
+      method: "DELETE",
+      url: `/api/v1/drafts/${combo.id}`,
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(deleted.statusCode, 204);
+    const active = await idsFor("/api/v1/drafts?q=ship");
+    assert.ok(!active.includes(combo.id), "q= respects the default active filter");
+    assert.deepEqual(await idsFor("/api/v1/drafts?q=ship&status=deleted"), [combo.id]);
+  });
+
   it("rejects version numbers beyond the safe integer range", async () => {
     const draft = (await createDraft(htmlDoc("huge"))).json<DraftBody>();
     const huge = "99999999999999999999";

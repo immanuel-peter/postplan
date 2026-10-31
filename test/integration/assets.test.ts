@@ -72,6 +72,38 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(none.nextCursor, null);
   });
 
+  it("paginates ?q= asset results within the filtered set", async () => {
+    for (const name of ["wand-a.png", "wand-b.png", "wand-c.png"]) {
+      await upload(name, "image/png", `${name} bytes`);
+    }
+    await upload("still.png", "image/png", "not a wand");
+
+    const walk = await t.app.inject({
+      method: "GET",
+      url: "/api/v1/assets?q=wand&limit=2",
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(walk.statusCode, 200, walk.body);
+    const first = walk.json<{ items: AssetBody[]; nextCursor: string | null }>();
+    assert.ok(first.items.length <= 2);
+    assert.ok(first.items.every((item) => item.filename?.startsWith("wand-")));
+    assert.ok(first.nextCursor !== null);
+
+    const second = await t.app.inject({
+      method: "GET",
+      url: `/api/v1/assets?q=wand&limit=2&cursor=${encodeURIComponent(first.nextCursor)}`,
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(second.statusCode, 200, second.body);
+    const secondBody = second.json<{ items: AssetBody[]; nextCursor: string | null }>();
+    assert.ok(secondBody.items.every((item) => item.filename?.startsWith("wand-")));
+    assert.ok(
+      secondBody.items.every((item) => !first.items.some((seen) => seen.id === item.id)),
+      "pages must not overlap",
+    );
+    assert.equal(secondBody.nextCursor, null);
+  });
+
   it("uploads, serves publicly with CORS, supports ranges, and deletes", async () => {
     const bytes = Buffer.from("0123456789");
     const created = await upload("digits.txt", "text/plain", bytes, "  some digits ");
