@@ -25,5 +25,5 @@ Dashboard: unlock → `/keys` → fill `#name` with `verify-postplan` → submit
 
 ## Gotchas
 
-- Helpers send `BOOTSTRAP_TOKEN` from `.env`, and boot keeps the live `bootstrap` row matched to it. Revoke any other key in a verification run. Revoking `bootstrap` leaves that row dead across restarts, and `/api/v1/me` stays 401 until someone restores it.
+- Don't revoke the bootstrap key. Helpers depend on it, and a restart won't bring it back.
 - Screenshots of `41-secret-once.png` contain a live secret for the local stack only. Revoke it before the run ends.

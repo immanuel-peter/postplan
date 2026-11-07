@@ -44,4 +44,4 @@ Pass when: 01 → 201 `currentVersion: 1`; 02 → 201 `currentVersion: 2`; 03 �
 
 - `If-Match` is the quoted number, `"1"`, not the `ETag` string.
 - `req.sh` records the Draft in `created.tsv`; cleanup soft-deletes it. Version rows stay, by design.
-- Helpers send `BOOTSTRAP_TOKEN` from `.env`. A restart makes the live `bootstrap` row match it. If doctor's `/api/v1/me` check fails, rerun `launch.sh` so the process picks up this checkout's `.env`. A revoked `bootstrap` row stays revoked until it is restored.
+- If doctor's `/api/v1/me` check fails, restart the stack first — `BOOTSTRAP_TOKEN` only syncs on boot. If it still fails, ask the user for a token.
