@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
-import { assets } from "../../src/db/schema.js";
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { assets, orphanObjects } from "../../src/db/schema.js";
 import { backfillThumbnails, getAsset } from "../../src/services/assets.js";
 import {
   apiHost,
@@ -315,6 +316,58 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(record.thumbKey, `thumbs/${id}.webp`);
     assert.ok(t.s3.has(t.config.s3Bucket, `thumbs/${id}.webp`));
     assert.equal(await backfillThumbnails({ db: t.db, s3: t.s3.asClient(), bucket: t.config.s3Bucket }), 0);
+  });
+
+  /** Runs backfill while counting the originals it downloads; `onThumbPut` runs before a thumbnail write lands. */
+  async function backfillCounting(onThumbPut?: () => Promise<void>) {
+    const send = t.s3.send.bind(t.s3);
+    let downloads = 0;
+    t.s3.send = async (command: unknown) => {
+      if (command instanceof GetObjectCommand) {
+        downloads++;
+      }
+      if (onThumbPut && command instanceof PutObjectCommand && command.input.Key?.startsWith("thumbs/")) {
+        await onThumbPut();
+      }
+      return send(command);
+    };
+    try {
+      const made = await backfillThumbnails({ db: t.db, s3: t.s3.asClient(), bucket: t.config.s3Bucket });
+      return { made, downloads };
+    } finally {
+      t.s3.send = send;
+    }
+  }
+
+  it("marks files it cannot preview so backfill never downloads them again", async () => {
+    const { id } = (await upload("broken.png", "image/png", "\x89PNG not really")).json<AssetBody>();
+    const uploaded = await getAsset(t.db, id);
+    assert.ok(!("kind" in uploaded));
+    assert.equal(uploaded.thumbKey, null);
+    assert.ok(uploaded.thumbFailedAt instanceof Date, "a failed preview at upload is recorded");
+
+    await t.db.update(assets).set({ thumbFailedAt: null }).where(eq(assets.id, id));
+    const first = await backfillCounting();
+    assert.equal(first.made, 0);
+    assert.equal(first.downloads, 1);
+    const marked = await getAsset(t.db, id);
+    assert.ok(!("kind" in marked) && marked.thumbFailedAt instanceof Date, "backfill records the failure");
+
+    const second = await backfillCounting();
+    assert.deepEqual(second, { made: 0, downloads: 0 });
+  });
+
+  it("records the thumbnail as an orphan when its asset is deleted mid-backfill", async () => {
+    const png = await sharp({ create: { width: 200, height: 150, channels: 3, background: "#808080" } }).png().toBuffer();
+    const { id } = (await upload("racing.png", "image/png", png)).json<AssetBody>();
+    await t.db.update(assets).set({ thumbKey: null, thumbColor: null }).where(eq(assets.id, id));
+
+    const { made } = await backfillCounting(async () => {
+      await t.db.delete(assets).where(eq(assets.id, id));
+    });
+    assert.equal(made, 0);
+    const orphans = await t.db.select().from(orphanObjects).where(eq(orphanObjects.objectKey, `thumbs/${id}.webp`));
+    assert.equal(orphans.length, 1);
   });
 
   it("404s unknown ids and other paths on the assets host", async () => {

@@ -94,6 +94,7 @@ export const assets = pgTable(
     description: text("description"),
     thumbKey: text("thumb_key"),
     thumbColor: text("thumb_color"),
+    thumbFailedAt: timestamp("thumb_failed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("assets_created_at_idx").on(t.createdAt)],

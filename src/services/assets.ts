@@ -24,6 +24,7 @@ export type AssetRecord = {
   description: string | null;
   thumbKey: string | null;
   thumbColor: string | null;
+  thumbFailedAt: Date | null;
   createdAt: Date;
 };
 
@@ -171,6 +172,7 @@ function asAsset(row: typeof assets.$inferSelect): AssetRecord {
     description: row.description,
     thumbKey: row.thumbKey,
     thumbColor: row.thumbColor,
+    thumbFailedAt: row.thumbFailedAt,
     createdAt: row.createdAt,
   };
 }
@@ -265,8 +267,7 @@ export async function createAsset(input: {
     objectKey,
     filename: input.filename,
     description: input.description ?? null,
-    thumbKey: thumb?.key ?? null,
-    thumbColor: thumb?.color ?? null,
+    ...thumb,
     createdAt: now,
   };
 
@@ -283,24 +284,34 @@ export async function createAsset(input: {
   return record;
 }
 
+type ThumbColumns = { thumbKey: string | null; thumbColor: string | null; thumbFailedAt: Date | null };
+
+/**
+ * Best-effort thumbnail as the columns to store. A file that can't be previewed gets
+ * `thumbFailedAt` so backfill won't retry it; a failed S3 write leaves all three null to retry later.
+ */
 async function storeThumbnail(input: {
   s3: S3Client;
   bucket: string;
   id: string;
   bytes: Buffer;
   contentType: string;
-}): Promise<{ key: string; color: string } | null> {
+}): Promise<ThumbColumns> {
+  const none: ThumbColumns = { thumbKey: null, thumbColor: null, thumbFailedAt: null };
+  if (!canThumbnail(input.contentType)) {
+    return none;
+  }
   const thumb = await makeThumbnail(input.bytes, input.contentType);
   if (!thumb) {
-    return null;
+    return { ...none, thumbFailedAt: new Date() };
   }
   const key = thumbObjectKey(input.id);
   try {
     await putBytes({ client: input.s3, bucket: input.bucket, objectKey: key, bytes: thumb.bytes, contentType: THUMB_CONTENT_TYPE });
   } catch {
-    return null;
+    return none;
   }
-  return { key, color: thumb.color };
+  return { thumbKey: key, thumbColor: thumb.color, thumbFailedAt: null };
 }
 
 /** Generates thumbnails for Assets uploaded before thumbnails existed. Returns how many it made. */
@@ -308,7 +319,7 @@ export async function backfillThumbnails(input: { db: Database; s3: S3Client; bu
   const rows = await input.db
     .select({ id: assets.id, objectKey: assets.objectKey, contentType: assets.contentType })
     .from(assets)
-    .where(isNull(assets.thumbKey))
+    .where(and(isNull(assets.thumbKey), isNull(assets.thumbFailedAt)))
     .orderBy(desc(assets.createdAt));
   let made = 0;
   for (const row of rows) {
@@ -322,14 +333,26 @@ export async function backfillThumbnails(input: { db: Database; s3: S3Client; bu
       continue;
     }
     const thumb = await storeThumbnail({ ...input, id: row.id, bytes, contentType: row.contentType });
-    if (!thumb) {
+    if (thumb.thumbKey === null && thumb.thumbFailedAt === null) {
       continue;
     }
-    await input.db
+    const updated = await input.db
       .update(assets)
-      .set({ thumbKey: thumb.key, thumbColor: thumb.color })
-      .where(and(eq(assets.id, row.id), isNull(assets.thumbKey)));
-    made++;
+      .set(thumb)
+      .where(and(eq(assets.id, row.id), isNull(assets.thumbKey)))
+      .returning({ id: assets.id });
+    if (updated.length === 0) {
+      // Deleted mid-backfill: nothing will ever delete this thumbnail. (If the row still exists,
+      // another backfill already attached the same key, so it must stay.)
+      const [stillThere] = await input.db.select({ id: assets.id }).from(assets).where(eq(assets.id, row.id));
+      if (thumb.thumbKey && !stillThere) {
+        await recordOrphan(input.db, thumb.thumbKey);
+      }
+      continue;
+    }
+    if (thumb.thumbKey) {
+      made++;
+    }
   }
   return made;
 }

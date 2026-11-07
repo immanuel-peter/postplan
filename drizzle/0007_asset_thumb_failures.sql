@@ -1,0 +1,1 @@
+ALTER TABLE "assets" ADD COLUMN "thumb_failed_at" timestamp with time zone;
