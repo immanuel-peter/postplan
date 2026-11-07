@@ -25,5 +25,5 @@ Dashboard: unlock → `/keys` → fill `#name` with `verify-postplan` → submit
 
 ## Gotchas
 
-- Never revoke the bootstrap token (name `bootstrap`). Every helper depends on it.
+- Don't revoke the bootstrap key. Helpers depend on it, and a restart won't bring it back.
 - Screenshots of `41-secret-once.png` contain a live secret for the local stack only. Revoke it before the run ends.

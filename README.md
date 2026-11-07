@@ -75,8 +75,8 @@ Services in the stack:
 
 Environment and secret settings:
 - Set `BASE_DOMAIN` to your apex domain.
-- Set `TOKEN_PEPPER` to a fixed secret string. Changing this value invalidates all stored tokens.
-- Set `BOOTSTRAP_TOKEN` to a secret value that begins with `pp_`. The system seeds this token only when the token table is empty.
+- Set `TOKEN_PEPPER` to a fixed secret string. Changing it breaks existing API keys, except bootstrap, which is reset from `BOOTSTRAP_TOKEN` on the next boot.
+- Set `BOOTSTRAP_TOKEN` to a secret that begins with `pp_`. This is your first API key.
 - Configure `CLOUDFLARE_TUNNEL_TOKEN` and the `GARAGE_*` secrets.
 
 ## Acknowledgments
