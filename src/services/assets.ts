@@ -1,12 +1,13 @@
-import { and, asc, count, desc, eq, gt, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { Database } from "../db/client.js";
 import { assets } from "../db/schema.js";
 import { sha256Hex } from "../lib/hash.js";
-import { localAssetUrl, publicAssetUrl } from "../lib/host.js";
+import { assetOrigin, localAssetUrl, publicAssetUrl } from "../lib/host.js";
 import { newId } from "../lib/ids.js";
 import { searchConditions } from "../lib/search.js";
-import { assetObjectKey, deleteObject, putBytes } from "../lib/s3.js";
+import { assetObjectKey, deleteObject, getBytes, putBytes, thumbObjectKey } from "../lib/s3.js";
+import { canThumbnail, makeThumbnail, THUMB_CONTENT_TYPE } from "../lib/thumbnails.js";
 import { recordOrphan } from "./orphans.js";
 import type { ServiceError } from "./types.js";
 
@@ -21,6 +22,9 @@ export type AssetRecord = {
   objectKey: string;
   filename: string | null;
   description: string | null;
+  thumbKey: string | null;
+  thumbColor: string | null;
+  thumbFailedAt: Date | null;
   createdAt: Date;
 };
 
@@ -37,6 +41,7 @@ export type AssetResponse = {
 
 export type AssetUrls = {
   publicUrl: (id: string, filename?: string | null | undefined) => string;
+  thumbUrl: (id: string) => string;
 };
 
 const EXTENSION_CONTENT_TYPES: Record<string, string> = {
@@ -97,13 +102,17 @@ export function extensionOf(filename: string | null): string | undefined {
 }
 
 export function assetUrls(input: { baseDomain: string; port: number; nodeEnv: string }): AssetUrls {
+  const origin = assetOrigin(input);
+  const thumbUrl = (id: string) => `${origin}/thumbs/${id}.webp`;
   if (input.nodeEnv === "development" || input.baseDomain.endsWith(".localhost")) {
     return {
       publicUrl: (id, filename) => localAssetUrl(input.port, id, extensionOf(filename ?? null)),
+      thumbUrl,
     };
   }
   return {
     publicUrl: (id, filename) => publicAssetUrl(input.baseDomain, id, extensionOf(filename ?? null)),
+    thumbUrl,
   };
 }
 
@@ -161,6 +170,9 @@ function asAsset(row: typeof assets.$inferSelect): AssetRecord {
     objectKey: row.objectKey,
     filename: row.filename,
     description: row.description,
+    thumbKey: row.thumbKey,
+    thumbColor: row.thumbColor,
+    thumbFailedAt: row.thumbFailedAt,
     createdAt: row.createdAt,
   };
 }
@@ -245,6 +257,7 @@ export async function createAsset(input: {
     bytes: input.bytes,
     contentType: input.contentType,
   });
+  const thumb = await storeThumbnail({ ...input, id });
 
   const record: AssetRecord = {
     id,
@@ -254,26 +267,94 @@ export async function createAsset(input: {
     objectKey,
     filename: input.filename,
     description: input.description ?? null,
+    ...thumb,
     createdAt: now,
   };
 
   try {
-    await input.db.insert(assets).values({
-      id,
-      contentType: input.contentType,
-      byteSize: input.bytes.byteLength,
-      sha256: record.sha256,
-      objectKey,
-      filename: input.filename,
-      description: input.description ?? null,
-      createdAt: now,
-    });
+    await input.db.insert(assets).values(record);
   } catch (error) {
     await recordOrphan(input.db, objectKey);
+    if (record.thumbKey) {
+      await recordOrphan(input.db, record.thumbKey);
+    }
     throw error;
   }
 
   return record;
+}
+
+type ThumbColumns = { thumbKey: string | null; thumbColor: string | null; thumbFailedAt: Date | null };
+
+/**
+ * Best-effort thumbnail as the columns to store. A file that can't be previewed gets
+ * `thumbFailedAt` so backfill won't retry it; a failed S3 write leaves all three null to retry later.
+ */
+async function storeThumbnail(input: {
+  s3: S3Client;
+  bucket: string;
+  id: string;
+  bytes: Buffer;
+  contentType: string;
+}): Promise<ThumbColumns> {
+  const none: ThumbColumns = { thumbKey: null, thumbColor: null, thumbFailedAt: null };
+  if (!canThumbnail(input.contentType)) {
+    return none;
+  }
+  const thumb = await makeThumbnail(input.bytes, input.contentType);
+  if (!thumb) {
+    return { ...none, thumbFailedAt: new Date() };
+  }
+  const key = thumbObjectKey(input.id);
+  try {
+    await putBytes({ client: input.s3, bucket: input.bucket, objectKey: key, bytes: thumb.bytes, contentType: THUMB_CONTENT_TYPE });
+  } catch {
+    return none;
+  }
+  return { thumbKey: key, thumbColor: thumb.color, thumbFailedAt: null };
+}
+
+/** Generates thumbnails for Assets uploaded before thumbnails existed. Returns how many it made. */
+export async function backfillThumbnails(input: { db: Database; s3: S3Client; bucket: string }): Promise<number> {
+  const rows = await input.db
+    .select({ id: assets.id, objectKey: assets.objectKey, contentType: assets.contentType })
+    .from(assets)
+    .where(and(isNull(assets.thumbKey), isNull(assets.thumbFailedAt)))
+    .orderBy(desc(assets.createdAt));
+  let made = 0;
+  for (const row of rows) {
+    if (!canThumbnail(row.contentType)) {
+      continue;
+    }
+    let bytes: Buffer;
+    try {
+      bytes = await getBytes({ client: input.s3, bucket: input.bucket, objectKey: row.objectKey });
+    } catch {
+      continue;
+    }
+    const thumb = await storeThumbnail({ ...input, id: row.id, bytes, contentType: row.contentType });
+    if (thumb.thumbKey === null && thumb.thumbFailedAt === null) {
+      continue;
+    }
+    const updated = await input.db
+      .update(assets)
+      .set(thumb)
+      .where(and(eq(assets.id, row.id), isNull(assets.thumbKey)))
+      .returning({ id: assets.id });
+    if (updated.length === 0) {
+      // Deleted mid-backfill: nothing will ever delete this thumbnail. (If the row still exists,
+      // another backfill already attached the same key, so it must stay.)
+      const [stillThere] = await input.db.select({ id: assets.id }).from(assets).where(eq(assets.id, row.id));
+      if (thumb.thumbKey && !stillThere) {
+        await recordOrphan(input.db, thumb.thumbKey);
+      }
+      continue;
+    }
+    if (thumb.thumbKey) {
+      made++;
+    }
+  }
+  return made;
 }
 
 export async function getAsset(db: Database, id: string): Promise<AssetRecord | ServiceError> {
@@ -391,10 +472,15 @@ export async function deleteAsset(input: {
   if ("kind" in existing) {
     return existing;
   }
-  try {
-    await deleteObject({ client: input.s3, bucket: input.bucket, objectKey: existing.objectKey });
-  } catch {
-    await recordOrphan(input.db, existing.objectKey);
+  for (const objectKey of [existing.objectKey, existing.thumbKey]) {
+    if (!objectKey) {
+      continue;
+    }
+    try {
+      await deleteObject({ client: input.s3, bucket: input.bucket, objectKey });
+    } catch {
+      await recordOrphan(input.db, objectKey);
+    }
   }
   await input.db.delete(assets).where(eq(assets.id, input.id));
   return existing;

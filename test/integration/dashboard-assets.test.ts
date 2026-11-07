@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { eq, ne } from "drizzle-orm";
 import { parseFragment } from "parse5";
+import sharp from "sharp";
 import { assets } from "../../src/db/schema.js";
 import { hashToken } from "../../src/lib/tokens.js";
 import { authenticateSession, createSession } from "../../src/services/admin.js";
@@ -55,7 +56,7 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     return res.body;
   }
 
-  async function apiUpload(filename: string, contentType: string, data: string, description?: string) {
+  async function apiUpload(filename: string, contentType: string, data: Buffer | string, description?: string) {
     const form = multipart([
       { name: "file", filename, contentType, data },
       ...(description === undefined ? [] : [{ name: "description", value: description }]),
@@ -102,7 +103,7 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
 
     const row = rowFor(one, "chart.png");
     assert.ok(row.includes(`<a class="thumb-sm" href="/assets/${png.id}" aria-label="Open chart.png">`));
-    assert.match(row, /<img src="https:\/\/assets\.postplan\.test\/[^"]+\.png" alt="" loading="lazy" \/>/);
+    assert.match(row, /<img src="https:\/\/assets\.postplan\.test\/[^"]+\.png" alt="" width="52" height="39" loading="lazy" decoding="async" \/>/, "an image that can't be thumbnailed falls back to the original");
     assert.ok(
       row.includes(
         `<a class="asset-filename" href="/assets/${png.id}" title="chart.png"><span class="filename-stem">chart</span><span class="filename-ext">.png</span></a>`,
@@ -149,6 +150,25 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
     assert.doesNotMatch(row, /cell-sub/, "no description line when the asset has none");
     assert.doesNotMatch(row, /ext-tag/);
     assert.match(row, /<td class="col-type hide-sm">\s*<span class="muted">—<\/span>/);
+  });
+
+  it("shows small thumbnails on a dominant-colour placeholder instead of the originals", async () => {
+    const png = await sharp({ create: { width: 1200, height: 900, channels: 3, background: "#c04020" } }).png().toBuffer();
+    const image = await apiUpload("photo.png", "image/png", png);
+    const record = await getAsset(t.db, image.id);
+    assert.ok(!("kind" in record) && record.thumbColor);
+
+    const html = await page();
+    const row = rowFor(html, "photo.png");
+    assert.ok(row.includes(`aria-label="Open photo.png" style="background-color: ${record.thumbColor}">`));
+    assert.ok(row.includes(`<img src="https://assets.postplan.test/thumbs/${image.id}.webp" alt="" width="52" height="39" loading="lazy" decoding="async" />`));
+    assert.ok(!row.includes(image.url), "the list does not load the original");
+    assert.match(html, /document\.documentElement\.classList\.add\("thumbs-fade"\)/);
+
+    await apiUpload("posterless.mp4", "video/mp4", "not really a video");
+    const clip = rowFor(await page(), "posterless.mp4");
+    assert.doesNotMatch(clip, /<video/);
+    assert.match(clip, /<span class="play-overlay" aria-hidden="true"><\/span>/);
   });
 
   it("draws a list icon for each kind of file", async () => {
@@ -217,11 +237,6 @@ describe("dashboard assets page", { skip: skipWithoutDb }, () => {
 
   it("stamps the upload time on the detail page for local rendering", async () => {
     const asset = await apiUpload("clip.mp4", "video/mp4", "not really a video");
-    const list = await page();
-    const row = rowFor(list, "clip.mp4");
-    assert.match(row, /<video src="[^"]+\.mp4" muted preload="metadata" playsinline><\/video>/);
-    assert.match(row, /<span class="play-overlay" aria-hidden="true"><\/span>/);
-
     const detail = await page(`/assets/${asset.id}`);
     assert.match(
       detail,

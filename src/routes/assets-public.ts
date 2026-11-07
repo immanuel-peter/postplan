@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AppDeps } from "../app.js";
-import { ASSET_DOCUMENT_CSP, CURRENT_CACHE_CONTROL } from "../lib/csp.js";
+import { ASSET_DOCUMENT_CSP, CURRENT_CACHE_CONTROL, IMMUTABLE_CACHE_CONTROL } from "../lib/csp.js";
 import { getObjectStream } from "../lib/s3.js";
 import type { AssetRecord } from "../services/assets.js";
 import { getAsset, parseAssetPath } from "../services/assets.js";
+import { THUMB_CONTENT_TYPE } from "../lib/thumbnails.js";
 import { isServiceError } from "../services/types.js";
 import { matchesEtag } from "../lib/request.js";
 
@@ -121,6 +122,30 @@ function applyAssetHeaders(
 export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   const assetsHost = assetsHostConstraint(deps.config.baseDomain);
   const assetsOnly = { constraints: { host: assetsHost } };
+
+  app.get<{ Params: { file: string } }>("/thumbs/:file", assetsOnly, async (request, reply) => {
+    const match = /^([A-Za-z0-9]+)\.webp$/.exec(request.params.file);
+    const record = match ? await getAsset(deps.db, match[1] ?? "") : null;
+    if (record === null || isServiceError(record) || record.thumbKey === null) {
+      reply.code(404).type("text/plain").send("not found");
+      return;
+    }
+    const etag = `"thumb-${record.sha256}"`;
+    reply
+      .header("ETag", etag)
+      .header("Cache-Control", IMMUTABLE_CACHE_CONTROL)
+      .header("Cross-Origin-Resource-Policy", "cross-origin")
+      .header("X-Content-Type-Options", "nosniff");
+    if (matchesEtag(request.headers["if-none-match"], etag)) {
+      return reply.code(304).send();
+    }
+    const result = await getObjectStream({ client: deps.s3, bucket: deps.config.s3Bucket, objectKey: record.thumbKey });
+    return reply
+      .header("Content-Type", THUMB_CONTENT_TYPE)
+      .header("Content-Length", String(result.contentLength))
+      .code(200)
+      .send(result.body);
+  });
 
   app.get<{ Params: AssetParams; Querystring: AssetQuery }>("/:id", assetsOnly, async (request, reply) => {
     if (request.hostKind.kind !== "assets") {

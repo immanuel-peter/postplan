@@ -92,7 +92,8 @@ type AssetItemRow = {
   filename: string;
   description: string | null;
   detailUrl: string;
-  thumbUrl: string;
+  thumbUrl: string | null;
+  thumbColor: string | null;
   sizeLabel: string;
   kind: AssetKind;
   extLabel: string;
@@ -490,15 +491,21 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         }
         const filename = assetDisplayName(asset.filename);
         const { stem, ext } = splitFilename(filename);
+        const kind = assetKindFromContentType(asset.contentType);
         totalBytes += asset.byteSize;
         items.push({
           id: asset.id,
           filename,
           description: asset.description,
           detailUrl: `/assets/${asset.id}`,
-          thumbUrl: deps.assetUrls.publicUrl(asset.id, asset.filename),
+          thumbUrl: asset.thumbKey
+            ? deps.assetUrls.thumbUrl(asset.id)
+            : kind === "image"
+              ? deps.assetUrls.publicUrl(asset.id, asset.filename)
+              : null,
+          thumbColor: asset.thumbColor,
           sizeLabel: formatBytes(asset.byteSize),
-          kind: assetKindFromContentType(asset.contentType),
+          kind,
           extLabel: assetExtLabel(filename),
           filenameStem: stem,
           filenameExt: ext,

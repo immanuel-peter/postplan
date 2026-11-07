@@ -96,6 +96,22 @@ export function assetObjectKey(id: string, filename: string | null): string {
   return `assets/${id}/${name}`;
 }
 
+export function thumbObjectKey(id: string): string {
+  return `thumbs/${id}.webp`;
+}
+
+export async function getBytes(input: {
+  client: S3Client;
+  bucket: string;
+  objectKey: string;
+}): Promise<Buffer> {
+  const result = await input.client.send(new GetObjectCommand({ Bucket: input.bucket, Key: input.objectKey }));
+  if (!result.Body) {
+    throw new Error(`missing body for ${input.objectKey}`);
+  }
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+
 export async function putBytes(input: {
   client: S3Client;
   bucket: string;
