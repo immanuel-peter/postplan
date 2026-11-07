@@ -15,7 +15,9 @@ while read -r f; do
     src/routes/api.ts) add publish-and-versions; add assets; add tokens ;;
     src/services/drafts.ts|src/lib/multipart.ts|src/lib/slug.ts|src/lib/tokens.ts|src/lib/auth.ts) add publish-and-versions ;;
     src/routes/public.ts|src/lib/csp.ts|src/lib/host.ts|src/lib/html.ts) add public-draft-serving ;;
-    src/routes/assets-public.ts|src/services/assets.ts|src/services/orphans.ts|src/lib/s3.ts) add assets ;;
+    src/routes/assets-public.ts|src/services/assets.ts|src/services/orphans.ts|src/lib/s3.ts|src/lib/thumbnails.ts) add assets ;;
+    src/lib/search.ts) add publish-and-versions; add assets ;;
+    src/public/table-search.js) add dashboard-drafts; add assets ;;
     src/views/assets/*) add assets ;;
     src/services/tokens.ts|src/views/tokens/*) add tokens ;;
     src/routes/dashboard.ts|src/views/drafts/*|src/views/layouts/main.eta|src/public/app.css|src/public/localtime.js|src/lib/time.ts) add dashboard-drafts ;;
