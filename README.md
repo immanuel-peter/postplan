@@ -75,8 +75,8 @@ Services in the stack:
 
 Environment and secret settings:
 - Set `BASE_DOMAIN` to your apex domain.
-- Set `TOKEN_PEPPER` to a fixed secret string. Changing this value invalidates all stored tokens.
-- Set `BOOTSTRAP_TOKEN` to a secret value that begins with `pp_`. The system seeds this token only when the token table is empty.
+- Set `TOKEN_PEPPER` to a fixed secret string. On boot the app rewrites the live `bootstrap` key so it matches this value and `BOOTSTRAP_TOKEN`. Other keys stay stored as they are, so they stop verifying after a pepper change.
+- Set `BOOTSTRAP_TOKEN` to a secret that begins with `pp_`. A revoked `bootstrap` row stays revoked across restarts.
 - Configure `CLOUDFLARE_TUNNEL_TOKEN` and the `GARAGE_*` secrets.
 
 ## Acknowledgments

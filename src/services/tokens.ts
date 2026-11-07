@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, or } from "drizzle-orm";
 import type { Database } from "../db/client.js";
 import { apiTokens } from "../db/schema.js";
 import { newId } from "../lib/ids.js";
@@ -116,34 +116,43 @@ export async function revokeToken(db: Database, id: string): Promise<TokenRecord
   return toRecord({ ...row, revokedAt: now });
 }
 
-export async function tokenCount(db: Database): Promise<number> {
-  const [row] = await db.select({ count: sql<number>`count(*)` }).from(apiTokens);
-  return Number(row?.count ?? 0);
-}
-
 export async function seedBootstrapToken(input: {
   db: Database;
   pepper: string;
   bootstrapToken: string;
 }): Promise<void> {
-  const count = await tokenCount(input.db);
-  if (count > 0) {
+  const [seed] = await input.db
+    .select()
+    .from(apiTokens)
+    .where(eq(apiTokens.name, "bootstrap"))
+    .orderBy(apiTokens.createdAt)
+    .limit(1);
+  if (seed?.revokedAt) {
     return;
   }
   if (!input.bootstrapToken.startsWith("pp_")) {
     throw new Error("BOOTSTRAP_TOKEN must start with pp_");
   }
-  await input.db.insert(apiTokens).values({
-    id: newId(),
-    name: "bootstrap",
-    prefix: tokenPrefix(input.bootstrapToken),
-    secretHash: hashToken(input.bootstrapToken, input.pepper),
-    scopes: [...ALL_SCOPES],
-    expiresAt: null,
-    lastUsedAt: null,
-    revokedAt: null,
-    createdAt: new Date(),
-  });
+  const secretHash = hashToken(input.bootstrapToken, input.pepper);
+  const prefix = tokenPrefix(input.bootstrapToken);
+  if (!seed) {
+    await input.db.insert(apiTokens).values({
+      id: newId(),
+      name: "bootstrap",
+      prefix,
+      secretHash,
+      scopes: [...ALL_SCOPES],
+      expiresAt: null,
+      lastUsedAt: null,
+      revokedAt: null,
+      createdAt: new Date(),
+    });
+    return;
+  }
+  if (hashesEqual(seed.secretHash, secretHash)) {
+    return;
+  }
+  await input.db.update(apiTokens).set({ secretHash, prefix }).where(eq(apiTokens.id, seed.id));
 }
 
 export function hasScope(token: TokenRecord, scope: Scope): boolean {
