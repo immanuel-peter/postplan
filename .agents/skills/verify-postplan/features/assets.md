@@ -5,10 +5,13 @@ Immutable binary blobs (images, video, PDFs, SVG, JSON) with a stable public URL
 ## Sub-features
 
 - Upload via API: `POST /api/v1/assets` (multipart `file`, optional `description`) → 201 with `id`, `url`, `contentType`, `byteSize`, `filename`, `description`
-- Upload via dashboard: `/assets` drop bar (`section#dropzone`, `aria-label="Upload"`), "Browse files" `#browse-files` opens the hidden `#file-input` (multiple). The page `fetch`es `POST /assets` with `_csrf` in the multipart body, then reloads. Errors show in `#assets-error` (`role="alert"`).
-- Dashboard list: `h2#all-assets`, `table.assets-table`, one row per Asset with `a.thumb-sm` and `a.asset-filename` → `/assets/{id}`
+- Upload via dashboard: `/assets` drop bar (`section#dropzone`, `aria-label="Upload"`, "Drop or paste files here"), "Browse files" `#browse-files` opens the hidden `#file-input` (multiple). The page `fetch`es `POST /assets` with `_csrf` in the multipart body, then reloads. Errors show in `#assets-error` (`role="alert"`).
+- Paste upload: pasting files anywhere on `/assets` (not into an input, textarea, select, or contenteditable) uploads them the same way. Clipboard images with no real name (`image.png`) are renamed `pasted-YYYY-MM-DD-HHMMSS.{ext}`, with `-1`, `-2`… when several are pasted at once.
+- Dashboard list: `h2#all-assets`, `table#assets-table.assets-table`, one row per Asset with `a.thumb-sm` and `a.asset-filename` → `/assets/{id}`. `a.thumb-sm` gets `background-color` from the stored dominant colour and an `img` from `/thumbs/{id}.webp` when a thumbnail exists; images without one fall back to the full asset URL; videos without one show only `.play-overlay`; everything else shows a `.thumb-icon`.
+- Live search on the list: `input[data-table-search="assets-table"]` ("Search assets…", only when there are Assets) hides rows client-side. Every word must appear in the filename, `.cell-sub` (description), or `.ext-tag`. No match shows `tr.search-empty` "No assets match your search."; Escape clears.
+- Thumbnails: on upload, raster images (png, jpeg, gif, webp, avif, tiff) and `video/*` (one frame via ffmpeg in the app image) get a 104×78 WebP at `thumbs/{id}.webp` in Garage, plus `thumb_color`. Served at `http://assets.postplan.localhost:3005/thumbs/{id}.webp` with `image/webp`, `ETag: "thumb-{sha256}"` (304 on match), immutable cache. SVG, PDF and other types get none (404). A file that can't be previewed gets `thumb_failed_at`. On boot the app backfills thumbnails for Assets with neither `thumb_key` nor `thumb_failed_at` (log line `thumbnail backfill done`).
 - Serve: `http://assets.postplan.localhost:3005/{id}[.ext]` with the stored content type, `ETag`, 304 on `If-None-Match`, `Range` requests (206)
-- Read/list: `GET /api/v1/assets`, `GET /api/v1/assets/{id}`
+- Read/list: `GET /api/v1/assets`, `GET /api/v1/assets/{id}`. `?q=` searches like Drafts: every whitespace-separated word must appear in `filename` or `description`, case-insensitive, `%` `_` `\` literal.
 - Description via API: `PATCH /api/v1/assets/{id}` (JSON `{"description": "..."}`)
 - Description in place on `/assets/{id}`: click `button#desc-display` ("Edit description"), type into `input#description` (counter `#desc-count` "/ 125", max 2000), press Enter to save or Escape to cancel; blur also saves. It saves via `fetch` POST to `form#desc-form`'s action without a page load. `#desc-status` shows "Saved" or the error, and `#desc-text`, the preview `alt`, and the Markdown/HTML snippets update live.
 - Detail page: `h1.asset-title` (filename), Download button (`.page-actions a[download]` → `{asset url}?download=1`, served `Content-Disposition: attachment`), Open button, `a#asset-url` + `button[data-copy="asset-url"]`, `img#asset-preview` for images, **Reference** section (`h2#reference-title`) with `code.ref-value[data-snippet="markdown"|"html"|…]` and `button[data-copy]` copy buttons, **Details** table (`table.details-table`)
@@ -33,7 +36,23 @@ $S/req.sh "$RUN" 23-describe PATCH "/api/v1/assets/$AID" -H 'Content-Type: appli
 $S/psql.sh "select id, description, byte_size from assets where id='$AID'" > "$RUN/24-asset-row.sql.txt"
 ```
 
-Pass when: 21 is 200 with the SVG bytes and an `image/svg+xml` type; 22 is 206; 23 echoes the new description, and so does 24.
+Thumbnails and search (ffmpeg is installed on the host):
+
+```bash
+ffmpeg -v error -y -f lavfi -i color=c=0x2266cc:s=320x240 -frames:v 1 "$RUN/blue.png"
+ffmpeg -v error -y -f lavfi -i color=c=0x22aa44:s=320x240:d=1 -pix_fmt yuv420p "$RUN/clip.mp4"
+$S/req.sh "$RUN" 20b-png POST /api/v1/assets -F "file=@$RUN/blue.png;type=image/png" -F "description=quokka blue"
+$S/req.sh "$RUN" 20c-mp4 POST /api/v1/assets -F "file=@$RUN/clip.mp4;type=video/mp4" -F "description=quokka green clip"
+PID=$($S/field.sh "$RUN/20b-png.body" id); MID=$($S/field.sh "$RUN/20c-mp4.body" id)
+$S/req.sh "$RUN" 25-thumb-png GET "http://assets.postplan.localhost:3005/thumbs/$PID.webp"
+$S/req.sh "$RUN" 25b-thumb-304 GET "http://assets.postplan.localhost:3005/thumbs/$PID.webp" -H "If-None-Match: \"thumb-$($S/field.sh "$RUN/20b-png.body" sha256)\""
+$S/req.sh "$RUN" 25c-thumb-mp4 GET "http://assets.postplan.localhost:3005/thumbs/$MID.webp"
+$S/req.sh "$RUN" 25d-thumb-svg GET "http://assets.postplan.localhost:3005/thumbs/$AID.webp"
+$S/req.sh "$RUN" 26-search GET "/api/v1/assets?q=quokka%20CLIP"
+$S/psql.sh "select id, content_type, thumb_key, thumb_color, thumb_failed_at from assets where id in ('$AID','$PID','$MID')" > "$RUN/27-thumb-rows.sql.txt"
+```
+
+Pass when: 21 is 200 with the SVG bytes and an `image/svg+xml` type; 22 is 206; 23 echoes the new description, and so does 24; 25 and 25c are 200 `image/webp`, 25b is 304, 25d is 404; 26 lists only `clip.mp4`; 27 shows `thumb_key` and a `#rrggbb` colour for the png and mp4 and nulls for the svg. The API response does not expose thumbnail fields.
 
 Dashboard (after unlocking per SKILL.md):
 
@@ -41,7 +60,10 @@ Dashboard (after unlocking per SKILL.md):
 2. Click `#browse-files`, then `browser_file_upload` with `$RUN/dot.svg` → the page reloads and a `dot.svg` row appears in `table.assets-table` → screenshot `26-uploaded.png`.
 3. Click its `a.asset-filename` → detail page. The id is the last path segment of the URL. Append `asset\t<id>` to `created.tsv`.
 4. Click `#desc-display`, type into `#description`, press Enter → `#desc-status` reads "Saved" and `code[data-snippet="markdown"]` contains the new alt text → screenshot `27-described.png`. Confirm with `$S/req.sh "$RUN" 28-after-describe GET /api/v1/assets/<id>`.
-5. To check delete: click `#delete-form button[type="submit"]`, screenshot the open `#delete-dialog`, click `button[data-confirm]` → `/assets?deleted=1` with the flash → screenshot. The asset URL → 404. Remove that id from `created.tsv`, or let cleanup's DELETE return 404.
+5. List search: fill `input[data-table-search="assets-table"]` with a word from one description → only matching rows stay visible; a nonsense word shows `tr.search-empty`; Escape clears. Thumbnails: `.thumb-sm img` srcs point at `/thumbs/{id}.webp` for png/mp4 rows.
+6. Paste: on `/assets`, dispatch a synthetic paste (headless has no real clipboard) and wait for the reload:
+   `await page.evaluate(() => new Promise(r => { const c = document.createElement('canvas'); c.width = 40; c.height = 30; c.getContext('2d').fillRect(0, 0, 40, 30); c.toBlob(b => { const dt = new DataTransfer(); dt.items.add(new File([b], 'image.png', { type: 'image/png' })); document.body.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); r(); }); }))` inside a snippet that awaited `page.waitForNavigation()` first. The newest row is `pasted-<stamp>.png`. Record its id in `created.tsv` (or delete it in step 7).
+7. To check delete: click `#delete-form button[type="submit"]`, screenshot the open `#delete-dialog`, click `button[data-confirm]` → `/assets?deleted=1` with the flash → screenshot. The asset URL → 404. Remove that id from `created.tsv`, or let cleanup's DELETE return 404.
 
 Stepping (needs a few Assets; upload them with explicit types, e.g. `-F "file=@clip.mp4;type=video/mp4"`):
 

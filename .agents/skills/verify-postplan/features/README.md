@@ -9,7 +9,9 @@ One file per user-facing feature. Each lists its sub-features, how a user reache
 | `src/routes/api.ts` | publish-and-versions, assets, tokens (whichever handlers changed) | no |
 | `src/services/drafts.ts`, `src/lib/{multipart,slug,tokens,auth}.ts` | [publish-and-versions](publish-and-versions.md) | no |
 | `src/routes/public.ts`, `src/lib/{csp,host,html}.ts` | [public-draft-serving](public-draft-serving.md) | no |
-| `src/routes/assets-public.ts`, `src/services/{assets,orphans}.ts`, `src/lib/s3.ts`, `src/views/assets/*` | [assets](assets.md) | for the dashboard sub-features |
+| `src/routes/assets-public.ts`, `src/services/{assets,orphans}.ts`, `src/lib/{s3,thumbnails}.ts`, `src/views/assets/*` | [assets](assets.md) | for the dashboard sub-features |
+| `src/lib/search.ts` (`?q=` on both list endpoints) | publish-and-versions, assets | no |
+| `src/public/table-search.js` (live search on the Drafts and Assets lists) | dashboard-drafts, assets | yes |
 | `src/routes/dashboard.ts`, `src/views/drafts/*`, `src/views/layouts/main.eta`, `src/public/{app.css,localtime.js}`, `src/lib/time.ts` | [dashboard-drafts](dashboard-drafts.md) | yes |
 | `src/services/tokens.ts`, `src/views/tokens/*` | [tokens](tokens.md) | for `/keys` |
 | `src/routes/auth.ts`, `src/lib/admin-*`, `src/services/admin.ts`, `src/public/webauthn.js`, `src/views/auth/*` | [passkey-auth](passkey-auth.md) | yes; auth is the subject |
