@@ -1094,16 +1094,28 @@ code {
   overflow: hidden;
 }
 
+.thumb-sm:has(img) {
+  background: #efede8;
+}
+
 .thumb-sm:hover {
   border-color: var(--muted);
 }
 
-.thumb-sm img,
-.thumb-sm video {
+.thumb-sm img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.thumbs-fade .thumb-sm img {
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.thumbs-fade .thumb-sm img.is-loaded {
+  opacity: 1;
 }
 
 .thumb-sm .thumb-icon {

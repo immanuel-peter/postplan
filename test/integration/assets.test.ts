@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import { eq } from "drizzle-orm";
+import sharp from "sharp";
+import { assets } from "../../src/db/schema.js";
+import { backfillThumbnails, getAsset } from "../../src/services/assets.js";
 import {
   apiHost,
   assetsHost,
@@ -253,6 +257,64 @@ describe("assets", { skip: skipWithoutDb }, () => {
       download.headers["content-disposition"],
       "attachment; filename=\"r_sum_.pdf\"; filename*=UTF-8''r%C3%A9sum%C3%A9.pdf",
     );
+  });
+
+  it("serves an immutable WebP thumbnail for images and removes it on delete", async () => {
+    const png = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: "#2050c0" } }).png().toBuffer();
+    const created = await upload("big.png", "image/png", png);
+    assert.equal(created.statusCode, 201, created.body);
+    const { id } = created.json<AssetBody>();
+    const record = await getAsset(t.db, id);
+    assert.ok(!("kind" in record));
+    assert.equal(record.thumbKey, `thumbs/${id}.webp`);
+    assert.match(record.thumbColor ?? "", /^#[0-9a-f]{6}$/);
+
+    const thumb = await t.app.inject({ method: "GET", url: `/thumbs/${id}.webp`, headers: assetsHost() });
+    assert.equal(thumb.statusCode, 200);
+    assert.equal(thumb.headers["content-type"], "image/webp");
+    assert.equal(thumb.headers["cache-control"], "public, max-age=31536000, immutable");
+    assert.equal(thumb.headers["cross-origin-resource-policy"], "cross-origin");
+    assert.ok(thumb.rawPayload.byteLength < png.byteLength / 4);
+    assert.equal((await sharp(thumb.rawPayload).metadata()).format, "webp");
+
+    const notModified = await t.app.inject({
+      method: "GET",
+      url: `/thumbs/${id}.webp`,
+      headers: { ...assetsHost(), "if-none-match": String(thumb.headers.etag) },
+    });
+    assert.equal(notModified.statusCode, 304);
+
+    const deleted = await t.app.inject({ method: "DELETE", url: `/api/v1/assets/${id}`, headers: { ...apiHost(), ...auth } });
+    assert.equal(deleted.statusCode, 204);
+    assert.equal(t.s3.has(t.config.s3Bucket, `thumbs/${id}.webp`), false);
+    const gone = await t.app.inject({ method: "GET", url: `/thumbs/${id}.webp`, headers: assetsHost() });
+    assert.equal(gone.statusCode, 404);
+  });
+
+  it("has no thumbnail for files it cannot preview", async () => {
+    const created = await upload("notes.txt", "text/plain", "hello");
+    const { id } = created.json<AssetBody>();
+    const record = await getAsset(t.db, id);
+    assert.ok(!("kind" in record));
+    assert.equal(record.thumbKey, null);
+    for (const url of [`/thumbs/${id}.webp`, `/thumbs/${id}.png`, "/thumbs/NOPE.webp"]) {
+      const res = await t.app.inject({ method: "GET", url, headers: assetsHost() });
+      assert.equal(res.statusCode, 404, url);
+    }
+  });
+
+  it("backfills thumbnails for assets uploaded before thumbnails existed", async () => {
+    const png = await sharp({ create: { width: 400, height: 300, channels: 3, background: "#30a030" } }).png().toBuffer();
+    const { id } = (await upload("old.png", "image/png", png)).json<AssetBody>();
+    await t.db.update(assets).set({ thumbKey: null, thumbColor: null }).where(eq(assets.id, id));
+    t.s3.objects.delete(`${t.config.s3Bucket}/thumbs/${id}.webp`);
+
+    assert.equal(await backfillThumbnails({ db: t.db, s3: t.s3.asClient(), bucket: t.config.s3Bucket }), 1);
+    const record = await getAsset(t.db, id);
+    assert.ok(!("kind" in record));
+    assert.equal(record.thumbKey, `thumbs/${id}.webp`);
+    assert.ok(t.s3.has(t.config.s3Bucket, `thumbs/${id}.webp`));
+    assert.equal(await backfillThumbnails({ db: t.db, s3: t.s3.asClient(), bucket: t.config.s3Bucket }), 0);
   });
 
   it("404s unknown ids and other paths on the assets host", async () => {

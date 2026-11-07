@@ -2,7 +2,7 @@ import { loadConfig } from "./config.js";
 import { createDb } from "./db/client.js";
 import { createS3, ensureBucket } from "./lib/s3.js";
 import { buildApp } from "./app.js";
-import { assetUrls } from "./services/assets.js";
+import { assetUrls, backfillThumbnails } from "./services/assets.js";
 import { draftUrls } from "./services/drafts.js";
 import { cleanupOrphans } from "./services/orphans.js";
 import { seedBootstrapToken } from "./services/tokens.js";
@@ -53,6 +53,11 @@ async function main() {
   }, 60 * 60 * 1000).unref();
 
   await app.listen({ port: config.port, host: "0.0.0.0" });
+
+  backfillThumbnails({ db, s3, bucket: config.s3Bucket }).then(
+    (made) => app.log.info({ made }, "thumbnail backfill done"),
+    (error: unknown) => app.log.error({ err: error }, "thumbnail backfill failed"),
+  );
 }
 
 main().catch((error: unknown) => {

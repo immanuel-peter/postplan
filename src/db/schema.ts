@@ -92,6 +92,8 @@ export const assets = pgTable(
     objectKey: text("object_key").notNull().unique(),
     filename: text("filename"),
     description: text("description"),
+    thumbKey: text("thumb_key"),
+    thumbColor: text("thumb_color"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("assets_created_at_idx").on(t.createdAt)],

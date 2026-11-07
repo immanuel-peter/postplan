@@ -43,6 +43,13 @@
       "when": 1791615884722,
       "tag": "0005_draft_favorite",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794020200237,
+      "tag": "0006_asset_thumbnails",
+      "breakpoints": true
     }
   ]
 }

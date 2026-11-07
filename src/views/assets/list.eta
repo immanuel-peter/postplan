@@ -98,6 +98,14 @@
     <% } %>
     <span class="panel-count"><%= it.summary %></span>
   </div>
+  <script>
+    document.addEventListener("load", markThumb, true);
+    document.addEventListener("error", markThumb, true);
+    function markThumb(e) {
+      if (e.target instanceof HTMLImageElement && e.target.closest(".thumb-sm")) e.target.classList.add("is-loaded");
+    }
+    document.documentElement.classList.add("thumbs-fade");
+  </script>
   <table class="data-table assets-table" id="assets-table">
     <thead>
       <tr>
@@ -116,11 +124,11 @@
         <tr>
           <td>
             <div class="asset-cell">
-              <a class="thumb-sm" href="<%= item.detailUrl %>" aria-label="Open <%= item.filename %>">
-                <% if (item.kind === "image") { %>
-                  <img src="<%= item.thumbUrl %>" alt="" loading="lazy" />
+              <a class="thumb-sm" href="<%= item.detailUrl %>" aria-label="Open <%= item.filename %>"<% if (item.thumbColor) { %> style="background-color: <%= item.thumbColor %>"<% } %>>
+                <% if (item.thumbUrl) { %>
+                  <img src="<%= item.thumbUrl %>" alt="" width="52" height="39" loading="lazy" decoding="async" />
+                  <% if (item.kind === "video") { %><span class="play-overlay" aria-hidden="true"></span><% } %>
                 <% } else if (item.kind === "video") { %>
-                  <video src="<%= item.thumbUrl %>" muted preload="metadata" playsinline></video>
                   <span class="play-overlay" aria-hidden="true"></span>
                 <% } else { %>
                   <span class="thumb-icon">
