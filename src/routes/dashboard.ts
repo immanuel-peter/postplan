@@ -28,7 +28,7 @@ import {
 import { createToken, listTokens, revokeToken } from "../services/tokens.js";
 import type { DraftRecord, VersionRecord } from "../services/types.js";
 import { isServiceError } from "../services/types.js";
-import { readField } from "../lib/request.js";
+import { isRecord, readField } from "../lib/request.js";
 
 type IdParams = {
   id: string;
@@ -399,14 +399,23 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     if (!isDashboardHost(request)) {
       return;
     }
+    // Each inline editor posts only its own field; a field left out of the body stays as it is.
+    const body = isRecord(request.body) ? request.body : {};
     const updated = await patchDraft({
       db: deps.db,
       id: request.params.id,
-      title: readField(request.body, "title"),
-      description: readField(request.body, "description"),
+      ...("title" in body ? { title: readField(body, "title") } : {}),
+      ...("description" in body ? { description: readField(body, "description") } : {}),
     });
     if (isServiceError(updated)) {
       return reply.code(404).type("text/plain").send("not found");
+    }
+    if (request.headers.accept === "application/json") {
+      return reply.send({
+        title: draftTitle(updated.title),
+        titleValue: updated.title ?? "",
+        description: updated.description?.trim() ?? "",
+      });
     }
     return reply.redirect(`/drafts/${updated.id}`);
   });

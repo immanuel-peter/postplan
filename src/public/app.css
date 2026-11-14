@@ -493,19 +493,6 @@ h2 {
   gap: 0.6rem;
 }
 
-.link-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--link);
-  font: inherit;
-  cursor: pointer;
-}
-
-.link-button:hover {
-  text-decoration: underline;
-}
-
 .btn-copy {
   padding: 0.4rem 0.75rem;
   border: 1px solid var(--input-border);
@@ -851,20 +838,6 @@ pre,
   line-height: 1.4;
 }
 
-.edit-form {
-  margin-top: 2.5rem;
-}
-
-.edit-form label {
-  display: block;
-  margin: 0.9rem 0 0.35rem;
-  color: var(--muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.02em;
-}
-
-.edit-form input,
-.edit-form textarea,
 .generate-form input[type="text"] {
   width: 100%;
   max-width: 36rem;
@@ -876,14 +849,6 @@ pre,
   font: inherit;
 }
 
-.edit-form textarea {
-  display: block;
-  resize: vertical;
-  min-height: 4.5rem;
-}
-
-.edit-form input:focus,
-.edit-form textarea:focus,
 .generate-form input[type="text"]:focus {
   outline: 2px solid color-mix(in srgb, var(--link) 35%, transparent);
   outline-offset: 1px;
@@ -944,10 +909,6 @@ input::placeholder {
   margin-top: 0.15rem;
   color: var(--muted);
   font-size: 0.75rem;
-}
-
-.delete-form {
-  margin-top: 1.75rem;
 }
 
 .secret-panel {
@@ -1544,6 +1505,32 @@ code {
 
 .desc-status.is-error .desc-status-check {
   display: none;
+}
+
+/* Draft detail: the title edits in place like the description, at heading size. */
+
+.title-form {
+  flex: 1 1 20rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.title-form .desc-display {
+  color: var(--text);
+  font-weight: inherit;
+  letter-spacing: inherit;
+}
+
+.title-form .desc-pencil {
+  width: 18px;
+  height: 18px;
+}
+
+.title-form .desc-row input {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
 .url-row {
