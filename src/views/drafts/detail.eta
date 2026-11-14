@@ -1,12 +1,87 @@
 <% layout("../layouts/main") %>
 <a class="back" href="/">← Drafts</a>
-<h1><%= it.draft.title %></h1>
-<% if (it.draft.description) { %>
-  <p class="lede"><%= it.draft.description %></p>
-<% } %>
-<p class="public-url-row">
-  <a class="public-url" href="<%= it.draft.publicUrl %>" target="_blank" rel="noreferrer"><%= it.draft.publicUrl %></a>
+<div class="page-head">
+  <form class="desc-form title-form" data-inline="title" method="post" action="/drafts/<%= it.draft.id %>">
+    <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+    <h1 class="asset-title">
+      <button class="desc-display" type="button" data-display aria-label="Edit title">
+        <span class="desc-text<%= it.draft.titleValue ? '' : ' is-empty' %>" data-text><%= it.draft.title %></span>
+        <svg class="desc-pencil" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 20h4L19 9l-4-4L4 16z" />
+          <path d="M13.5 6.5l4 4" />
+        </svg>
+      </button>
+    </h1>
+    <div class="desc-editor">
+      <div class="desc-row">
+        <input id="title" name="title" type="text" value="<%= it.draft.titleValue %>" placeholder="Untitled draft" aria-label="Title" autocomplete="off" />
+        <button class="btn btn-dark btn-sm desc-save" type="submit">Save</button>
+      </div>
+      <p class="desc-help"><span>Enter to save · Esc to cancel</span></p>
+    </div>
+    <p class="desc-status" data-status role="status" hidden>
+      <svg class="desc-status-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+      <span data-msg></span>
+    </p>
+  </form>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="<%= it.draft.publicUrl %>" target="_blank" rel="noreferrer">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M14 4h6v6" />
+        <path d="M20 4l-9 9" />
+        <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+      </svg>
+      <span>Open</span>
+    </a>
+    <form method="post" action="/drafts/<%= it.draft.id %>/delete" id="delete-form">
+      <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+      <button class="btn btn-danger-soft" type="submit">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16" />
+          <path d="M10 11v6" />
+          <path d="M14 11v6" />
+          <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+          <path d="M9 7V4h6v3" />
+        </svg>
+        <span>Delete</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<form class="desc-form" data-inline="description" method="post" action="/drafts/<%= it.draft.id %>">
+  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+  <button class="desc-display" type="button" data-display aria-label="Edit description">
+    <span class="desc-text<%= it.draft.description ? '' : ' is-empty' %>" data-text><%= it.draft.description || "Add a description" %></span>
+    <svg class="desc-pencil" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
+  </button>
+  <div class="desc-editor">
+    <div class="desc-row">
+      <input id="description" name="description" type="text" value="<%= it.draft.description %>" placeholder="Describe the draft" aria-label="Description" autocomplete="off" />
+      <button class="btn btn-dark btn-sm desc-save" type="submit">Save</button>
+    </div>
+    <p class="desc-help"><span>Enter to save · Esc to cancel</span></p>
+  </div>
+  <p class="desc-status" data-status role="status" hidden>
+    <svg class="desc-status-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+    <span data-msg></span>
+  </p>
+</form>
+
+<p class="url-row">
+  <a class="public-url" id="draft-url" href="<%= it.draft.publicUrl %>" target="_blank" rel="noreferrer"><%= it.draft.publicUrl %></a>
+  <button class="icon-btn" type="button" data-copy="draft-url" aria-label="Copy link">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a1 1 0 0 1 1-1h10" />
+    </svg>
+    <span data-copy-label>Copy</span>
+  </button>
 </p>
+
 <div class="panel">
   <table class="data-table versions-table">
     <thead>
@@ -33,15 +108,150 @@
     </tbody>
   </table>
 </div>
-<form class="edit-form" method="post" action="/drafts/<%= it.draft.id %>">
-  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-  <label for="title">Title</label>
-  <input id="title" name="title" type="text" value="<%= it.draft.titleValue %>" />
-  <label for="description">Description</label>
-  <textarea id="description" name="description" rows="3"><%= it.draft.description %></textarea>
-  <button class="btn-primary btn-compact" type="submit">Save</button>
-</form>
-<form class="delete-form" method="post" action="/drafts/<%= it.draft.id %>/delete" onsubmit="return confirm('Delete draft')">
-  <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
-  <button class="link-button" type="submit">Delete draft</button>
-</form>
+
+<dialog class="confirm" id="delete-dialog" aria-labelledby="delete-title">
+  <h2 id="delete-title">Delete “<span data-dialog-title><%= it.draft.title %></span>”?</h2>
+  <p>Its public URL and every version stop serving right away.</p>
+  <div class="dialog-actions">
+    <button class="btn btn-secondary" type="button" data-cancel autofocus>Cancel</button>
+    <button class="btn btn-danger" type="button" data-confirm>Delete draft</button>
+  </div>
+</dialog>
+
+<script>
+  (function () {
+    var button = document.querySelector("[data-copy]");
+    var target = document.getElementById(button.getAttribute("data-copy"));
+    var label = button.querySelector("[data-copy-label]");
+    button.addEventListener("click", function () {
+      navigator.clipboard.writeText(target.textContent || "").then(function () {
+        label.textContent = "Copied";
+        setTimeout(function () { label.textContent = "Copy"; }, 1500);
+      });
+    });
+  })();
+
+  (function () {
+    // Title and description: shown as text, edited in place. Without this script each form posts normally.
+    function render(field, data) {
+      if (field === "title") {
+        document.title = data.title + " · PostPlan";
+        document.querySelector("[data-dialog-title]").textContent = data.title;
+        return { text: data.title, empty: !data.titleValue, saved: data.titleValue };
+      }
+      return { text: data.description || "Add a description", empty: !data.description, saved: data.description };
+    }
+
+    document.querySelectorAll("[data-inline]").forEach(function (form) {
+      var field = form.getAttribute("data-inline");
+      var display = form.querySelector("[data-display]");
+      var text = form.querySelector("[data-text]");
+      var input = form.querySelector('input[name="' + field + '"]');
+      var status = form.querySelector("[data-status]");
+      var message = status.querySelector("[data-msg]");
+      var csrf = form.querySelector('input[name="_csrf"]').value;
+      var saved = input.value.trim();
+      var saving = false;
+      var timer = null;
+
+      form.classList.add("is-inline");
+
+      function showStatus(kind, words) {
+        clearTimeout(timer);
+        status.className = "desc-status is-" + kind;
+        message.textContent = words;
+        status.hidden = false;
+        if (kind === "saved") {
+          timer = setTimeout(function () { status.hidden = true; }, 2000);
+        }
+      }
+
+      function open() {
+        input.value = saved;
+        form.classList.add("is-editing");
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+
+      function close(refocus) {
+        form.classList.remove("is-editing");
+        if (refocus) display.focus();
+      }
+
+      async function commit(refocus) {
+        if (saving) return;
+        var value = input.value.trim();
+        if (value === saved) {
+          close(refocus);
+          return;
+        }
+        saving = true;
+        var body = new URLSearchParams({ _csrf: csrf });
+        body.set(field, value);
+        try {
+          var response = await fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin",
+            keepalive: true,
+            headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
+            body: body,
+          });
+          if (!response.ok) throw new Error("save failed");
+          var view = render(field, await response.json());
+          saved = view.saved;
+          text.textContent = view.text;
+          text.classList.toggle("is-empty", view.empty);
+          close(refocus);
+          showStatus("saved", "Saved");
+        } catch (err) {
+          showStatus("error", "Couldn’t save the " + field + ". Try again.");
+        } finally {
+          saving = false;
+        }
+      }
+
+      display.addEventListener("click", open);
+      input.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit(true);
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          input.value = saved;
+          close(true);
+        }
+      });
+      input.addEventListener("blur", function () {
+        if (form.classList.contains("is-editing")) commit(false);
+      });
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        commit(true);
+      });
+    });
+  })();
+
+  (function () {
+    // Delete asks in a dialog first; without dialog support it falls back to confirm().
+    var form = document.getElementById("delete-form");
+    var dialog = document.getElementById("delete-dialog");
+    var useDialog =
+      typeof HTMLDialogElement === "function" && dialog instanceof HTMLDialogElement && typeof dialog.showModal === "function";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (useDialog) {
+        dialog.showModal();
+      } else if (window.confirm(dialog.querySelector("h2").textContent)) {
+        form.submit();
+      }
+    });
+    if (!useDialog) return;
+    dialog.querySelector("[data-cancel]").addEventListener("click", function () {
+      dialog.close();
+    });
+    dialog.querySelector("[data-confirm]").addEventListener("click", function () {
+      dialog.close();
+      form.submit();
+    });
+  })();
+</script>

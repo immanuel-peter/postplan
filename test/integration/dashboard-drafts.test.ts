@@ -291,4 +291,26 @@ describe("dashboard drafts list", { skip: skipWithoutDb }, () => {
     const stamps = [...html.matchAll(/<time datetime="[^"]+Z" data-local>/g)];
     assert.equal(stamps.length, 2, "one stamp per version");
   });
+
+  it("saves only the field an inline editor sends", async () => {
+    const draft = await createDraft({ title: "Before", description: "Keep me" });
+    const save = (payload: Record<string, string>) =>
+      t.app.inject({
+        method: "POST",
+        url: `/drafts/${draft.id}`,
+        headers: { ...apiHost(), cookie, origin: ORIGIN, accept: "application/json" },
+        payload: { _csrf: csrf, ...payload },
+      });
+
+    const renamed = await save({ title: "After" });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    assert.deepEqual(renamed.json(), { title: "After", titleValue: "After", description: "Keep me" });
+
+    const cleared = await save({ title: "" });
+    assert.deepEqual(cleared.json(), { title: "Untitled draft", titleValue: "", description: "Keep me" });
+
+    const described = await save({ description: "New words" });
+    assert.deepEqual(described.json(), { title: "Untitled draft", titleValue: "", description: "New words" });
+    assert.equal((await apiDraft(draft.id)).description, "New words");
+  });
 });
