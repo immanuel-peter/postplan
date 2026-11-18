@@ -158,6 +158,7 @@ describe("dashboard guard", { skip: skipWithoutDb }, () => {
     assert.equal(sw.statusCode, 200);
     assert.match(sw.headers["content-type"] ?? "", /^text\/javascript/);
     assert.equal(sw.headers["cache-control"], "no-cache");
+    assert.match(sw.body, /const VERSION = "[0-9a-f]{12}"/);
 
     const offline = await t.app.inject({ method: "GET", url: "/static/offline.html", headers: apiHost() });
     assert.equal(offline.statusCode, 200);

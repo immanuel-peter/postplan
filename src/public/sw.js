@@ -1,5 +1,6 @@
-const CACHE = "postplan-offline-v1";
-const OFFLINE_URL = "/static/offline.html";
+const VERSION = "__OFFLINE_VERSION__";
+const CACHE = `postplan-offline-${VERSION}`;
+const OFFLINE_URL = `/static/offline.html?v=${VERSION}`;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.add(OFFLINE_URL)).then(() => self.skipWaiting()));

@@ -202,7 +202,8 @@ export async function buildApp(deps: AppDeps) {
     return reply.type("application/manifest+json; charset=utf-8").send(manifest);
   });
 
-  const serviceWorker = readFileSync(join(here, "public", "sw.js"), "utf8");
+  const offlineVersion = sha256Hex(Buffer.from(offlineHtml, "utf8")).slice(0, 12);
+  const serviceWorker = readFileSync(join(here, "public", "sw.js"), "utf8").replace("__OFFLINE_VERSION__", offlineVersion);
   app.get("/sw.js", dashboardOnly, async (_request, reply) => {
     return reply.type("text/javascript; charset=utf-8").header("Cache-Control", "no-cache").send(serviceWorker);
   });
