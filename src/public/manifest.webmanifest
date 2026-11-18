@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "PostPlan",
-  "short_name": "PostPlan",
+  "name": "Postplan",
+  "short_name": "Postplan",
   "description": "Self-hosted HTML Drafts and Assets.",
   "start_url": "/",
   "scope": "/",

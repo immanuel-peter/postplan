@@ -15,7 +15,7 @@ const ORIGIN = "https://postplan.test";
 const COOKIE = "__Host-postplan_session";
 
 const REMOVED_UNLOCK_COPY = [
-  "Unlock PostPlan",
+  "Unlock Postplan",
   "This dashboard is private. Verify with a passkey to continue.",
   "Touch ID, or your device password if you prefer.",
   "Published Drafts and Assets stay public. Only the dashboard is locked.",

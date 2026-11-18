@@ -89,9 +89,9 @@ Doctor's last line says which path applies:
 
 Steps (same for setup and recovery; `<mode>` is `setup` or `recovery`):
 
-1. `browser_navigate` → `http://postplan.localhost:3005/setup`. Expect "Set up PostPlan" or "Recover access", matching doctor.
+1. `browser_navigate` → `http://postplan.localhost:3005/setup`. Expect "Set up Postplan" or "Recover access", matching doctor.
 2. `browser_run_code_unsafe` with `filename: ".agents/skills/verify-postplan/playwright/attach-authenticator.js"`
-3. `$S/secret-fill.sh <mode>`, then `browser_run_code_unsafe` with `filename: ".verify/auth/fill-secret.js"` → title "Add your passkey · PostPlan". Then `rm .verify/auth/fill-secret.js`.
+3. `$S/secret-fill.sh <mode>`, then `browser_run_code_unsafe` with `filename: ".verify/auth/fill-secret.js"` → title "Add your passkey · Postplan". Then `rm .verify/auth/fill-secret.js`.
 4. `browser_run_code_unsafe` with code `async (page) => { await page.locator('#device').fill('verify-postplan agent'); await page.locator('#enroll').click(); await page.waitForURL((u) => !u.pathname.startsWith('/setup')); return page.url(); }`. The name must be exact: doctor and future agents rely on it. Lands on `/`.
 5. `$S/passkey-save.sh`, then `browser_run_code_unsafe` with `filename: ".verify/auth/save-passkey.js"` → `{saved: 1}`. That writes `.verify/auth/passkey.json`, replacing any stale file. Then `rm .verify/auth/save-passkey.js`.
 6. If you used recovery, say so in the report.

@@ -15,7 +15,7 @@ export function relyingParty(config: AppConfig): RelyingParty {
   const local = config.nodeEnv === "development" || config.baseDomain.endsWith(".localhost");
   return {
     id: config.baseDomain,
-    name: "PostPlan",
+    name: "Postplan",
     origin: local
       ? `http://${config.baseDomain}:${String(config.port)}`
       : `https://${config.baseDomain}`,

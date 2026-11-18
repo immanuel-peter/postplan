@@ -61,7 +61,7 @@ export async function buildApp(deps: AppDeps) {
     openapi: {
       openapi: "3.1.0",
       info: {
-        title: "PostPlan API",
+        title: "Postplan API",
         version: "1.0.0",
         description: "Single-tenant HTML Draft publishing API",
       },

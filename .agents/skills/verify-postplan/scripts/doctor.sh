@@ -46,7 +46,7 @@ SETUP=$(curl -s -m 3 -o /dev/null -w '%{http_code} %{redirect_url}' "$BASE/setup
 SETUP_BODY=$(curl -s -m 3 "$BASE/setup")
 case "$SETUP_BODY" in
   *"Recover access"*) MODE="recovery secret unused (available)" ;;
-  *"Set up PostPlan"*) MODE="first-run setup open" ;;
+  *"Set up Postplan"*) MODE="first-run setup open" ;;
   *) MODE="no setup/recovery available ($SETUP); rotate ADMIN_RECOVERY_SECRET to re-enroll" ;;
 esac
 if [ -f "$REPO/.verify/auth/passkey.json" ]; then
