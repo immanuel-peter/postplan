@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AppDeps } from "../app.js";
 import { ASSET_DOCUMENT_CSP, CURRENT_CACHE_CONTROL, IMMUTABLE_CACHE_CONTROL } from "../lib/csp.js";
@@ -122,6 +125,18 @@ function applyAssetHeaders(
 export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppDeps): Promise<void> {
   const assetsHost = assetsHostConstraint(deps.config.baseDomain);
   const assetsOnly = { constraints: { host: assetsHost } };
+
+  const here = dirname(fileURLToPath(import.meta.url));
+  const icons: Array<[string, string, Buffer]> = [
+    ["/favicon.ico", "image/x-icon", readFileSync(join(here, "..", "public", "favicon-asset.ico"))],
+    ["/favicon.svg", "image/svg+xml", readFileSync(join(here, "..", "public", "favicon-asset.svg"))],
+    ["/apple-touch-icon.png", "image/png", readFileSync(join(here, "..", "public", "apple-touch-icon-asset.png"))],
+  ];
+  for (const [path, type, body] of icons) {
+    app.get(path, assetsOnly, async (_request, reply) => {
+      return reply.header("Cache-Control", IMMUTABLE_CACHE_CONTROL).type(type).send(body);
+    });
+  }
 
   app.get<{ Params: { file: string } }>("/thumbs/:file", assetsOnly, async (request, reply) => {
     const match = /^([A-Za-z0-9]+)\.webp$/.exec(request.params.file);
