@@ -370,6 +370,15 @@ describe("assets", { skip: skipWithoutDb }, () => {
     assert.equal(orphans.length, 1);
   });
 
+  it("serves the asset favicon on the assets host", async () => {
+    for (const [url, type] of [["/favicon.ico", "image/x-icon"], ["/favicon.svg", "image/svg+xml"], ["/apple-touch-icon.png", "image/png"]] as const) {
+      const res = await t.app.inject({ method: "GET", url, headers: assetsHost() });
+      assert.equal(res.statusCode, 200, url);
+      assert.equal(res.headers["content-type"], type, url);
+      assert.ok(res.rawPayload.length > 0, url);
+    }
+  });
+
   it("404s unknown ids and other paths on the assets host", async () => {
     for (const url of ["/NOPE", "/NOPE.png", "/a/b/c"]) {
       const res = await t.app.inject({ method: "GET", url, headers: assetsHost() });
