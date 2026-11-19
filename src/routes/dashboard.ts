@@ -68,6 +68,7 @@ type DraftList = {
 type VersionRow = {
   versionLabel: string;
   versionUrl: string;
+  downloadUrl: string;
   commitLabel: string;
   dirty: boolean;
   refLabel: string;
@@ -216,12 +217,19 @@ function buildDraftList(drafts: DraftRecord[], urls: DraftUrls, show: DraftListS
   };
 }
 
+function downloadUrl(url: string): string {
+  const download = new URL(url);
+  download.searchParams.set("download", "1");
+  return download.href;
+}
+
 function toVersionRow(version: VersionRecord, versionUrl: string): VersionRow {
   const commit = shortCommit(version.gitCommit);
   const dirty = version.gitCommit === null || version.gitCommit.trim() === "";
   return {
     versionLabel: `v${String(version.versionNumber)}`,
     versionUrl,
+    downloadUrl: downloadUrl(versionUrl),
     commitLabel: dirty ? "—" : commit,
     dirty,
     refLabel: refLabel(version.gitRef, version.gitCommit),
@@ -388,6 +396,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
         titleValue: draft.title ?? "",
         description: draft.description?.trim() ?? "",
         publicUrl: deps.urls.publicUrl(draft.slug),
+        downloadUrl: downloadUrl(deps.urls.publicUrl(draft.slug)),
       },
       versions: versions.map((version) =>
         toVersionRow(version, deps.urls.publicUrl(draft.slug, version.versionNumber)),

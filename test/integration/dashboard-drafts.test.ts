@@ -292,6 +292,15 @@ describe("dashboard drafts list", { skip: skipWithoutDb }, () => {
     assert.equal(stamps.length, 2, "one stamp per version");
   });
 
+  it("links a Download for the latest and for each version", async () => {
+    const html = await page(`/drafts/${versioned.id}`);
+    const origin = `https://${versioned.slug}.postplan.test`;
+    assert.ok(html.includes(`href="${origin}/?download=1" download>`), "header button downloads the latest");
+    for (const n of [1, 2]) {
+      assert.ok(html.includes(`href="${origin}/v/${n}?download=1" download aria-label="Download v${n}"`), `row v${n}`);
+    }
+  });
+
   it("saves only the field an inline editor sends", async () => {
     const draft = await createDraft({ title: "Before", description: "Keep me" });
     const save = (payload: Record<string, string>) =>
