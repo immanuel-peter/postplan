@@ -14,7 +14,7 @@ while read -r f; do
   case "$f" in
     src/routes/api.ts) add publish-and-versions; add assets; add tokens ;;
     src/services/drafts.ts|src/lib/multipart.ts|src/lib/slug.ts|src/lib/tokens.ts|src/lib/auth.ts) add publish-and-versions ;;
-    src/routes/public.ts|src/lib/csp.ts|src/lib/host.ts|src/lib/html.ts) add public-draft-serving ;;
+    src/routes/public.ts|src/lib/csp.ts|src/lib/host.ts|src/lib/html.ts|src/lib/link-preview.ts|src/lib/og-card.ts) add public-draft-serving ;;
     src/routes/assets-public.ts|src/services/assets.ts|src/services/orphans.ts|src/lib/s3.ts|src/lib/thumbnails.ts) add assets ;;
     src/lib/search.ts) add publish-and-versions; add assets ;;
     src/public/table-search.js) add dashboard-drafts; add assets ;;
