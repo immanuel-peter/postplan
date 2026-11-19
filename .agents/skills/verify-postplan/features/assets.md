@@ -10,7 +10,8 @@ Immutable binary blobs (images, video, PDFs, SVG, JSON) with a stable public URL
 - Dashboard list: `h2#all-assets`, `table#assets-table.assets-table`, one row per Asset with `a.thumb-sm` and `a.asset-filename` → `/assets/{id}`. `a.thumb-sm` gets `background-color` from the stored dominant colour and an `img` from `/thumbs/{id}.webp` when a thumbnail exists; images without one fall back to the full asset URL; videos without one show only `.play-overlay`; everything else shows a `.thumb-icon`.
 - Live search on the list: `input[data-table-search="assets-table"]` ("Search assets…", only when there are Assets) hides rows client-side. Every word must appear in the filename, `.cell-sub` (description), or `.ext-tag`. No match shows `tr.search-empty` "No assets match your search."; Escape clears.
 - Thumbnails: on upload, raster images (png, jpeg, gif, webp, avif, tiff) and `video/*` (one frame via ffmpeg in the app image) get a 104×78 WebP at `thumbs/{id}.webp` in Garage, plus `thumb_color`. Served at `http://assets.postplan.localhost:3005/thumbs/{id}.webp` with `image/webp`, `ETag: "thumb-{sha256}"` (304 on match), immutable cache. SVG, PDF and other types get none (404). A file that can't be previewed gets `thumb_failed_at`. On boot the app backfills thumbnails for Assets with neither `thumb_key` nor `thumb_failed_at` (log line `thumbnail backfill done`).
-- Serve: `http://assets.postplan.localhost:3005/{id}[.ext]` with the stored content type, `ETag`, 304 on `If-None-Match`, `Range` requests (206)
+- Serve: `http://assets.postplan.localhost:3005/{id}[.ext]` with the stored content type, `Content-Disposition: inline` (`attachment` with `?download=1`), `ETag`, `Cache-Control: public, max-age=60, must-revalidate`, 304 on `If-None-Match`, `Range` requests (206), an unsatisfiable range → 416 with `Content-Range: bytes */<size>`. Every file response carries `ASSET_DOCUMENT_CSP`: `default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox`
+- Asset-host icons: `/favicon.ico` (`image/x-icon`), `/favicon.svg`, `/apple-touch-icon.png` on `assets.postplan.localhost:3005`, `Cache-Control: ... immutable`. They are the asset-tab icon, distinct from the dashboard and Draft icons; the CSP's `img-src 'self'` lets Chrome load them for a sandboxed asset document
 - Read/list: `GET /api/v1/assets`, `GET /api/v1/assets/{id}`. `?q=` searches like Drafts: every whitespace-separated word must appear in `filename` or `description`, case-insensitive, `%` `_` `\` literal.
 - Description via API: `PATCH /api/v1/assets/{id}` (JSON `{"description": "..."}`)
 - Description in place on `/assets/{id}`: click `button#desc-display` ("Edit description"), type into `input#description` (counter `#desc-count` "/ 125", max 2000), press Enter to save or Escape to cancel; blur also saves. It saves via `fetch` POST to `form#desc-form`'s action without a page load. `#desc-status` shows "Saved" or the error, and `#desc-text`, the preview `alt`, and the Markdown/HTML snippets update live.
@@ -32,6 +33,9 @@ AID=$($S/field.sh "$RUN/20-upload.body" id)
 AURL=$($S/field.sh "$RUN/20-upload.body" url)
 $S/req.sh "$RUN" 21-public GET "$AURL"
 $S/req.sh "$RUN" 22-range GET "$AURL" -H 'Range: bytes=0-9'
+$S/req.sh "$RUN" 22b-range-416 GET "$AURL" -H 'Range: bytes=999999-'
+$S/req.sh "$RUN" 22c-download GET "$AURL?download=1"
+for i in favicon.ico favicon.svg apple-touch-icon.png; do $S/req.sh "$RUN" "29-icon-$i" GET "http://assets.postplan.localhost:3005/$i"; done
 $S/req.sh "$RUN" 23-describe PATCH "/api/v1/assets/$AID" -H 'Content-Type: application/json' -d '{"description":"red square, edited"}'
 $S/psql.sh "select id, description, byte_size from assets where id='$AID'" > "$RUN/24-asset-row.sql.txt"
 ```
@@ -52,7 +56,7 @@ $S/req.sh "$RUN" 26-search GET "/api/v1/assets?q=quokka%20CLIP"
 $S/psql.sh "select id, content_type, thumb_key, thumb_color, thumb_failed_at from assets where id in ('$AID','$PID','$MID')" > "$RUN/27-thumb-rows.sql.txt"
 ```
 
-Pass when: 21 is 200 with the SVG bytes and an `image/svg+xml` type; 22 is 206; 23 echoes the new description, and so does 24; 25 and 25c are 200 `image/webp`, 25b is 304, 25d is 404; 26 lists only `clip.mp4`; 27 shows `thumb_key` and a `#rrggbb` colour for the png and mp4 and nulls for the svg. The API response does not expose thumbnail fields.
+Pass when: 21 is 200 with the SVG bytes, an `image/svg+xml` type and the CSP above; 22 is 206; 22b is 416 with `Content-Range: bytes */<size>`; 22c has `Content-Disposition: attachment; filename="dot.svg"`; the three icons are 200 with `immutable`; 23 echoes the new description, and so does 24; 25 and 25c are 200 `image/webp`, 25b is 304, 25d is 404; 26 lists only `clip.mp4`; 27 shows `thumb_key` and a `#rrggbb` colour for the png and mp4 and nulls for the svg. The API response does not expose thumbnail fields.
 
 Dashboard (after unlocking per SKILL.md):
 
@@ -75,6 +79,6 @@ Stepping (needs a few Assets; upload them with explicit types, e.g. `-F "file=@c
 ## Gotchas
 
 - `url` in the API response is the asset host URL with extension. The bare `/{id}` works too.
-- SVGs are served with a sandboxing CSP (`ASSET_DOCUMENT_CSP`). Check that header when `src/lib/csp.ts` changes.
+- Assets are served with a sandboxing CSP (`ASSET_DOCUMENT_CSP`). Check that header when `src/lib/csp.ts` changes. The sandbox gives the document an opaque origin, so `fetch` from inside an asset tab fails; check the icons with curl.
 - The upload posts `_csrf` inside its multipart body. That is the one path `admin-guard.ts` exempts from the normal CSRF hook. Changes to `src/lib/admin-guard.ts` or `src/lib/multipart.ts` need the dashboard upload driven, not just the API.
 - Headless Chrome reports `pointer: none`, so the touch rules (`pointer: coarse`: 40px pager targets and no key hint) do not apply there. A device preset alone does not flip it. Use mobile and touch emulation (CDP `Emulation.setDeviceMetricsOverride` with `mobile: true` plus `Emulation.setTouchEmulationEnabled`) to check them. Clear `localStorage` to see the key hint again after a key press.
