@@ -16,6 +16,8 @@ esac
 
 echo "$METHOD $URL $*" > "$RUN/$NAME.req"
 STATUS=$(curl -sS -X "$METHOD" "${AUTH[@]+"${AUTH[@]}"}" -D "$RUN/$NAME.headers" -o "$RUN/$NAME.body" -w '%{http_code}' "$URL" "$@")
+# curl writes no body file for an empty response (304, 204).
+touch "$RUN/$NAME.body"
 
 if [ "$METHOD" = POST ] && [ "$STATUS" = 201 ]; then
   case "$TARGET" in
@@ -31,6 +33,6 @@ if [ "$METHOD" = POST ] && [ "$STATUS" = 201 ]; then
 fi
 
 echo "HTTP $STATUS  $METHOD $URL"
-grep -iE '^(content-type|content-security-policy|etag|location|cache-control):' "$RUN/$NAME.headers" || true
+grep -iE '^(content-type|content-security-policy|etag|location|cache-control|content-disposition|vary):' "$RUN/$NAME.headers" || true
 # Token secrets stay in the saved body (gitignored) but never reach stdout.
-head -c 1500 "$RUN/$NAME.body" | sed -E 's/pp_[A-Za-z0-9_-]{8,}/pp_[redacted]/g'; echo
+head -c 1500 "$RUN/$NAME.body" | LC_ALL=C sed -E 's/pp_[A-Za-z0-9_-]{8,}/pp_[redacted]/g'; echo

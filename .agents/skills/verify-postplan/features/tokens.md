@@ -4,10 +4,10 @@ Bearer credentials (`pp_…`) for the API. Every token is a master key: no scope
 
 ## Sub-features
 
-- Generate in dashboard: `/keys` → **New key** panel (`h2#new-key-title`): `form.generate-form[action="/keys"]` with `#name`, submit "Generate a new API key" → `.secret-panel` shows the secret once in `code#new-secret` with `#copy-secret`. The note says "Keys are shown once." Errors are in `p.form-error`.
+- Generate in dashboard: `/keys` → **New key** panel (`h2#new-key-title`): `form.generate-form[action="/keys"]` with `#name`, submit "Generate a new API key" → `.secret-panel` shows the secret once in `code#new-secret` with `#copy-secret`. The note says "Keys are shown once." A blank name becomes `API · <timestamp>`. (`list.eta` has a `p.form-error` slot, but no handler fills it today.)
 - List: **Keys** panel (`h2#keys-title`, `.panel-count`) with a `table.data-table` row per token: `.cell-title` name, `.cell-sub` prefix + `…`, created and last used. Secrets never show again on reload.
 - Revoke in dashboard: `form[action="/keys/{id}/revoke"]` (`data-confirm-name`, `data-confirm-prefix`), button `aria-label="Revoke <name>"` → `<dialog id="revoke-dialog">` naming the key and prefix → `button[data-confirm]` "Revoke key" (`[data-cancel]` cancels). Falls back to `window.confirm` without `<dialog>` support. A revoked token gets 401 on the API.
-- API: `GET /api/v1/tokens`, `POST /api/v1/tokens` (JSON `{"name": "..."}`, returns the secret once), `DELETE /api/v1/tokens/{id}` → 204, `GET /api/v1/me`
+- API: `GET /api/v1/tokens`, `POST /api/v1/tokens` (JSON `{"name": "..."}`, optional `expiresAt`) → 201 with the secret once, `DELETE /api/v1/tokens/{id}` → 204, `GET /api/v1/me`
 
 ## How to get to it (user POV)
 

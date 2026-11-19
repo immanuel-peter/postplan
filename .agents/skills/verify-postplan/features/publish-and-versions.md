@@ -5,11 +5,11 @@ Agents publish self-contained HTML to `/api/v1`. Creating a Draft publishes Vers
 ## Sub-features
 
 - Create a Draft: `POST /api/v1/drafts` (multipart `html` file + optional `title`, `description`, `repository_url`, `repository_name`, `git_ref`, `git_commit`) → 201, `ETag`, body with `id`, `slug`, `currentVersion: 1`, `publicUrl`, `versionUrl`, `contentSha256`
-- Idempotent create: same `Idempotency-Key` + same request → same Draft; same key + different request → 409
-- Append a Version: `POST /api/v1/drafts/{id}/versions` with `If-Match: "<current>"` (or `expectedVersion` field) → 201, `currentVersion` = current + 1
-- Optimistic concurrency: stale `If-Match` → 409 with `currentVersion`; missing precondition → 428
+- Idempotency: same `Idempotency-Key` + same request → same result; same key + different request → 409. Works on create and on append.
+- Append a Version: `POST /api/v1/drafts/{id}/versions` (multipart `html`, optional `git_ref`, `git_commit`) with `If-Match: "<current>"` (or `expectedVersion` field) → 201, `currentVersion` = current + 1. A deleted Draft → 404.
+- Optimistic concurrency: stale `If-Match` → 409 "Version conflict" with `currentVersion`; missing precondition → 428; malformed (`"x"`) → 400 "invalid expected version"
 - List and read: `GET /api/v1/drafts`, `GET /api/v1/drafts/{id}`, `GET /api/v1/drafts/{id}/versions`, `GET /api/v1/drafts/{id}/versions/{n}`
-- Search: `GET /api/v1/drafts?q=...` splits on whitespace, and every word must appear (case-insensitive substring) in `title`, `description`, or `repositoryName`. `%`, `_`, `\` match literally. Query capped at 200 chars. Combines with `status`, `repository`, `cursor`.
+- Search: `GET /api/v1/drafts?q=...` splits on whitespace, and every word must appear (case-insensitive substring) in `title`, `description`, or `repositoryName`. `%`, `_`, `\` match literally. Query capped at 200 chars. Combines with `status` (default `active`), `repository` (empty value = no repository), `cursor`, `limit` (default 50, max 100).
 - Metadata: `PATCH /api/v1/drafts/{id}` (JSON `title`, `description`, `repositoryUrl`, `repositoryName`, `gitRef`, `gitCommit`). Repository fields are set only here, never in the dashboard.
 - Soft delete: `DELETE /api/v1/drafts/{id}` → 204
 
@@ -30,6 +30,7 @@ SLUG=$($S/field.sh "$RUN/01-create.body" slug)
 $S/req.sh "$RUN" 02-append POST "/api/v1/drafts/$ID/versions" -H 'If-Match: "1"' -F "html=@$RUN/v2.html;type=text/html"
 $S/req.sh "$RUN" 03-stale POST "/api/v1/drafts/$ID/versions" -H 'If-Match: "1"' -F "html=@$RUN/v1.html;type=text/html"
 $S/req.sh "$RUN" 04-no-precondition POST "/api/v1/drafts/$ID/versions" -F "html=@$RUN/v1.html;type=text/html"
+$S/req.sh "$RUN" 04b-bad-precondition POST "/api/v1/drafts/$ID/versions" -H 'If-Match: "x"' -F "html=@$RUN/v1.html;type=text/html"
 $S/req.sh "$RUN" 05-versions GET "/api/v1/drafts/$ID/versions"
 $S/req.sh "$RUN" 06-latest GET "http://$SLUG.postplan.localhost:3005/"
 $S/req.sh "$RUN" 07-v1 GET "http://$SLUG.postplan.localhost:3005/v/1"
@@ -38,7 +39,7 @@ $S/req.sh "$RUN" 09-search GET "/api/v1/drafts?q=$(basename "$RUN" | tr 'a-z' 'A
 $S/req.sh "$RUN" 09b-search-miss GET "/api/v1/drafts?q=$(basename "$RUN")%20nomatchxyz"
 ```
 
-Pass when: 01 → 201 `currentVersion: 1`; 02 → 201 `currentVersion: 2`; 03 → 409 with `currentVersion: 2`; 04 → 428; 05 lists 1 and 2; 06 body contains `verify v2` and 07 body contains `verify v1` (the bytes really landed in Garage); 08 shows exactly rows 1 and 2; 09 lists exactly this Draft (upper-cased title word plus a `repositoryName` word); 09b has empty `items`. To check literal wildcards, put `50%_off` in a title and search `q=50%25_` (match) vs `q=50_` (no match).
+Pass when: 01 → 201 `currentVersion: 1`; 02 → 201 `currentVersion: 2`; 03 → 409 with `currentVersion: 2`; 04 → 428; 04b → 400; 05 lists 1 and 2; 06 body contains `verify v2` and 07 body contains `verify v1` (the bytes really landed in Garage); 08 shows exactly rows 1 and 2; 09 lists exactly this Draft (upper-cased title word plus a `repositoryName` word); 09b has empty `items`. To check literal wildcards, put `50%_off` in a title and search `q=50%25_` (match) vs `q=50_` (no match).
 
 ## Gotchas
 
