@@ -44,7 +44,7 @@ import {
 } from "../services/admin.js";
 import { readField } from "../lib/request.js";
 
-/** One admin identity: a fixed WebAuthn user handle, no owner table (ADR 0008). */
+/** One admin identity: a fixed WebAuthn user handle, no owner table. */
 const ADMIN_USER_ID = new TextEncoder().encode("postplan-admin");
 const ADMIN_USER_NAME = "admin";
 
