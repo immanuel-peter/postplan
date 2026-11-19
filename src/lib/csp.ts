@@ -13,6 +13,7 @@ export function currentEtag(draftId: string, currentVersion: number): string {
   return `"${draftId}-${currentVersion}"`;
 }
 
-export function versionEtag(sha256: string): string {
-  return `"${sha256}"`;
+/** Draft HTML carries injected link-preview tags, so its ETag names both the bytes and the preview. */
+export function documentEtag(tag: string, previewFingerprint: string): string {
+  return `"${tag}.${previewFingerprint}"`;
 }

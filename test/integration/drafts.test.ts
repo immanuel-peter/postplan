@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
+import sharp from "sharp";
 import {
   apiHost,
   auth,
@@ -22,6 +23,16 @@ type DraftBody = {
   gitRef: string | null;
   gitCommit: string | null;
 };
+
+/** The served HTML minus the block of link-preview tags injected after `<head>`. */
+function withoutPreview(body: string): string {
+  return body.replace(/\n(?:<meta (?:property="og:[a-z:_]+"|name="twitter:card") content="[^"]*">\n)+/, "");
+}
+
+function metaContent(body: string, key: string): string[] {
+  const attribute = key.startsWith("twitter:") ? "name" : "property";
+  return [...body.matchAll(new RegExp(`<meta ${attribute}="${key}" content="([^"]*)">`, "g"))].map((m) => m[1] ?? "");
+}
 
 describe("draft lifecycle", { skip: skipWithoutDb }, () => {
   let t: TestApp;
@@ -70,9 +81,9 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
 
     const latest = await t.app.inject({ method: "GET", url: "/", headers: draftHost(draft.slug) });
     assert.equal(latest.statusCode, 200);
-    assert.equal(latest.body, v1);
+    assert.equal(withoutPreview(latest.body), v1);
     assert.match(latest.headers["content-type"] ?? "", /^text\/html/);
-    assert.equal(latest.headers.etag, `"${draft.id}-1"`);
+    assert.match(String(latest.headers.etag), new RegExp(`^"${draft.id}-1\\.[0-9a-f]{12}"$`));
     assert.equal(latest.headers["cache-control"], "public, max-age=60, must-revalidate");
     assert.equal(latest.headers["x-frame-options"], "DENY");
     assert.match(String(latest.headers["content-security-policy"]), /default-src 'none'/);
@@ -84,14 +95,14 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(bumped.json<DraftBody>().currentVersion, 2);
 
     const latest2 = await t.app.inject({ method: "GET", url: "/", headers: draftHost(draft.slug) });
-    assert.equal(latest2.body, v2);
-    assert.equal(latest2.headers.etag, `"${draft.id}-2"`);
+    assert.equal(withoutPreview(latest2.body), v2);
+    assert.match(String(latest2.headers.etag), new RegExp(`^"${draft.id}-2\\.[0-9a-f]{12}"$`));
 
     const pinned = await t.app.inject({ method: "GET", url: "/v/1", headers: draftHost(draft.slug) });
     assert.equal(pinned.statusCode, 200);
-    assert.equal(pinned.body, v1, "old versions stay immutable");
+    assert.equal(withoutPreview(pinned.body), v1, "old versions stay immutable");
     assert.equal(pinned.headers["cache-control"], "public, max-age=31536000, immutable");
-    assert.equal(pinned.headers.etag, `"${draft.contentSha256}"`);
+    assert.match(String(pinned.headers.etag), new RegExp(`^"${draft.contentSha256}\\.[0-9a-f]{12}"$`));
 
     const versions = await t.app.inject({
       method: "GET",
@@ -118,7 +129,8 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(again.statusCode, 304);
     assert.equal(again.body, "");
 
-    const pinnedEtag = `"${draft.contentSha256}"`;
+    const pinnedFirst = await t.app.inject({ method: "GET", url: "/v/1", headers: draftHost(draft.slug) });
+    const pinnedEtag = String(pinnedFirst.headers.etag);
     const pinned = await t.app.inject({
       method: "GET",
       url: "/v/1",
@@ -398,5 +410,102 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
       headers: { ...draftHost(draft.slug), ...auth },
     });
     assert.equal(apiOnDraftHost.statusCode, 404, "the API must not answer on draft subdomains");
+  });
+
+  it("adds link-preview tags that point at the Draft's card", async () => {
+    const draft = (await createDraft(htmlDoc("preview"), { title: `Cache "hits" <2026>`, description: "Per-workload" })).json<DraftBody>();
+    const origin = `https://${draft.slug}.postplan.test`;
+
+    const page = await t.app.inject({ method: "GET", url: "/", headers: draftHost(draft.slug) });
+    assert.deepEqual(metaContent(page.body, "og:title"), ["Cache &quot;hits&quot; &lt;2026&gt;"]);
+    assert.deepEqual(metaContent(page.body, "og:description"), ["Per-workload"]);
+    assert.deepEqual(metaContent(page.body, "og:url"), [`${origin}/`]);
+    assert.deepEqual(metaContent(page.body, "og:image"), [`${origin}/og.png`]);
+    assert.deepEqual(metaContent(page.body, "twitter:card"), ["summary_large_image"]);
+
+    const pinned = await t.app.inject({ method: "GET", url: "/v/1", headers: draftHost(draft.slug) });
+    assert.deepEqual(metaContent(pinned.body, "og:url"), [`${origin}/v/1`]);
+    assert.deepEqual(metaContent(pinned.body, "og:image"), [`${origin}/v/1/og.png`]);
+
+    const renamed = await t.app.inject({
+      method: "PATCH",
+      url: `/api/v1/drafts/${draft.id}`,
+      headers: { ...apiHost(), ...auth },
+      payload: { title: "Renamed" },
+    });
+    assert.equal(renamed.statusCode, 200, renamed.body);
+    const retitled = await t.app.inject({
+      method: "GET",
+      url: "/",
+      headers: { ...draftHost(draft.slug), "if-none-match": String(page.headers.etag) },
+    });
+    assert.equal(retitled.statusCode, 200, "a title edit changes the served tags, so the old ETag must miss");
+    assert.deepEqual(metaContent(retitled.body, "og:title"), ["Renamed"]);
+  });
+
+  it("leaves link-preview tags the Draft declares itself", async () => {
+    const html =
+      '<!doctype html><html><head><meta property="og:image" content="https://example.com/mine.png">' +
+      '<meta name="twitter:card" content="summary"><title>own</title></head><body>own</body></html>';
+    const draft = (await createDraft(html, { title: "Own preview" })).json<DraftBody>();
+    const page = await t.app.inject({ method: "GET", url: "/", headers: draftHost(draft.slug) });
+    assert.deepEqual(metaContent(page.body, "og:image"), ["https://example.com/mine.png"]);
+    assert.deepEqual(metaContent(page.body, "og:image:width"), []);
+    assert.deepEqual(metaContent(page.body, "twitter:card"), ["summary"]);
+    assert.deepEqual(metaContent(page.body, "og:title"), ["Own preview"]);
+  });
+
+  it("serves a 1200x630 PNG card for the latest and pinned versions", async () => {
+    const draft = (await createDraft(htmlDoc("card"), { title: "Card title" })).json<DraftBody>();
+
+    const card = await t.app.inject({ method: "GET", url: "/og.png", headers: draftHost(draft.slug) });
+    assert.equal(card.statusCode, 200);
+    assert.equal(card.headers["content-type"], "image/png");
+    assert.equal(card.headers["cache-control"], "public, max-age=60, must-revalidate");
+    assert.equal(card.headers["x-content-type-options"], "nosniff");
+    const meta = await sharp(card.rawPayload).metadata();
+    assert.equal(meta.format, "png");
+    assert.equal(meta.width, 1200);
+    assert.equal(meta.height, 630);
+
+    const etag = String(card.headers.etag);
+    assert.match(etag, /^"og-[0-9a-f]{24}"$/);
+    const cached = await t.app.inject({
+      method: "GET",
+      url: "/og.png",
+      headers: { ...draftHost(draft.slug), "if-none-match": etag },
+    });
+    assert.equal(cached.statusCode, 304);
+
+    const pinned = await t.app.inject({ method: "GET", url: "/v/1/og.png", headers: draftHost(draft.slug) });
+    assert.equal(pinned.statusCode, 200);
+    assert.equal(pinned.headers["content-type"], "image/png");
+
+    await addVersion(draft.id, htmlDoc("card v2"), { "if-match": '"1"' });
+    const bumped = await t.app.inject({ method: "GET", url: "/og.png", headers: draftHost(draft.slug) });
+    assert.notEqual(bumped.headers.etag, etag, "the card shows the version, so a publish changes it");
+
+    for (const url of ["/v/3/og.png", "/v/abc/og.png"]) {
+      const missing = await t.app.inject({ method: "GET", url, headers: draftHost(draft.slug) });
+      assert.equal(missing.statusCode, 404, url);
+    }
+    const unknown = await t.app.inject({ method: "GET", url: "/og.png", headers: draftHost("nosuchslug") });
+    assert.equal(unknown.statusCode, 404);
+  });
+
+  it("renders a card for an untitled Draft from its HTML and hides it once deleted", async () => {
+    const draft = (await createDraft(htmlDoc("untitled"))).json<DraftBody>();
+    const card = await t.app.inject({ method: "GET", url: "/og.png", headers: draftHost(draft.slug) });
+    assert.equal(card.statusCode, 200);
+    assert.equal(card.headers["content-type"], "image/png");
+
+    const deleted = await t.app.inject({
+      method: "DELETE",
+      url: `/api/v1/drafts/${draft.id}`,
+      headers: { ...apiHost(), ...auth },
+    });
+    assert.equal(deleted.statusCode, 204);
+    const gone = await t.app.inject({ method: "GET", url: "/og.png", headers: draftHost(draft.slug) });
+    assert.equal(gone.statusCode, 404);
   });
 });

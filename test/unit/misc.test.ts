@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { SECURITY_POLICY_VERSION, currentEtag, draftCsp, versionEtag } from "../../src/lib/csp.js";
+import { SECURITY_POLICY_VERSION, currentEtag, documentEtag, draftCsp } from "../../src/lib/csp.js";
 import { assetObjectKey, versionObjectKey } from "../../src/lib/s3.js";
 import { generateSlug, isReservedSlug } from "../../src/lib/slug.js";
 import { formatStamp, shortCommit } from "../../src/lib/time.js";
@@ -24,7 +24,7 @@ describe("draftCsp", () => {
 
   it("builds quoted etags", () => {
     assert.equal(currentEtag("d1", 3), '"d1-3"');
-    assert.equal(versionEtag("abc"), '"abc"');
+    assert.equal(documentEtag("abc", "f00"), '"abc.f00"');
   });
 });
 
