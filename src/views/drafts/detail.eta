@@ -25,6 +25,14 @@
     </p>
   </form>
   <div class="page-actions">
+    <a class="btn btn-secondary" href="<%= it.draft.downloadUrl %>" download>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 4v11" />
+        <path d="M7 10l5 5 5-5" />
+        <path d="M5 20h14" />
+      </svg>
+      <span>Download</span>
+    </a>
     <a class="btn btn-secondary" href="<%= it.draft.publicUrl %>" target="_blank" rel="noreferrer">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M14 4h6v6" />
@@ -90,6 +98,7 @@
         <th scope="col">Commit</th>
         <th scope="col" class="hide-sm">Ref</th>
         <th scope="col" class="col-time">Published</th>
+        <th scope="col" class="col-download"><span class="sr-only">Download</span></th>
       </tr>
     </thead>
     <tbody>
@@ -103,6 +112,15 @@
           </td>
           <td class="muted mono hide-sm"><%= version.refLabel %></td>
           <td class="col-time"><time datetime="<%= version.publishedIso %>" data-local><%= version.publishedLabel %></time></td>
+          <td class="col-download">
+            <a class="icon-btn" href="<%= version.downloadUrl %>" download aria-label="Download <%= version.versionLabel %>" title="Download <%= version.versionLabel %>">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 4v11" />
+                <path d="M7 10l5 5 5-5" />
+                <path d="M5 20h14" />
+              </svg>
+            </a>
+          </td>
         </tr>
       <% } %>
     </tbody>

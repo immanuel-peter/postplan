@@ -27,6 +27,10 @@ type VersionParams = {
   n: string;
 };
 
+type DownloadQuery = {
+  download?: unknown;
+};
+
 function draftHostConstraint(baseDomain: string): RegExp {
   const escaped = baseDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`^(?!assets\\.)[^./]+\\.${escaped}(?::\\d+)?$`, "i");
@@ -87,14 +91,20 @@ async function servePublicHtml(
     return;
   }
 
-  const etag = documentEtag(
-    versionNumber === undefined ? `${found.draft.id}-${found.draft.currentVersion}` : found.version.contentSha256,
-    previewFingerprint(found.draft),
-  );
+  const download = (request.query as DownloadQuery).download === "1";
+  const etag = download
+    ? `"${found.version.contentSha256}.download"`
+    : documentEtag(
+        versionNumber === undefined ? `${found.draft.id}-${found.draft.currentVersion}` : found.version.contentSha256,
+        previewFingerprint(found.draft),
+      );
   const cacheControl = versionNumber === undefined ? CURRENT_CACHE_CONTROL : IMMUTABLE_CACHE_CONTROL;
   const vary = versionNumber === undefined;
 
   applyDocumentHeaders(reply, etag, cacheControl, vary, contentSecurityPolicy);
+  if (download) {
+    reply.header("Content-Disposition", `attachment; filename="${slug}-v${found.version.versionNumber}.html"`);
+  }
   if (matchesEtag(request.headers["if-none-match"], etag)) {
     reply.code(304).send();
     return;
@@ -105,6 +115,10 @@ async function servePublicHtml(
     bucket: deps.config.s3Bucket,
     objectKey: found.version.objectKey,
   });
+  if (download) {
+    reply.code(200).type(HTML_TYPE).send(bytes);
+    return;
+  }
   const pageUrl = deps.urls.publicUrl(slug, versionNumber);
   const html = addLinkPreview(bytes.toString("utf8"), {
     title: found.draft.title,

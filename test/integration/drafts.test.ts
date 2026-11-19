@@ -139,6 +139,34 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(pinned.statusCode, 304);
   });
 
+  it("downloads the stored HTML as an attachment", async () => {
+    const v1 = htmlDoc("<h1>dl v1</h1>");
+    const draft = (await createDraft(v1, { title: "Download me" })).json<DraftBody>();
+    const v2 = htmlDoc("<h1>dl v2</h1>");
+    assert.equal((await addVersion(draft.id, v2, { "if-match": '"1"' })).statusCode, 201);
+
+    const pinned = await t.app.inject({ method: "GET", url: "/v/1?download=1", headers: draftHost(draft.slug) });
+    assert.equal(pinned.statusCode, 200);
+    assert.equal(pinned.body, v1, "no link-preview tags injected");
+    assert.equal(pinned.headers["content-disposition"], `attachment; filename="${draft.slug}-v1.html"`);
+    assert.equal(pinned.headers["cache-control"], "public, max-age=31536000, immutable");
+
+    const latest = await t.app.inject({ method: "GET", url: "/?download=1", headers: draftHost(draft.slug) });
+    assert.equal(latest.body, v2);
+    assert.equal(latest.headers["content-disposition"], `attachment; filename="${draft.slug}-v2.html"`);
+
+    const viewed = await t.app.inject({ method: "GET", url: "/v/1", headers: draftHost(draft.slug) });
+    assert.equal(viewed.headers["content-disposition"], undefined);
+    assert.notEqual(viewed.headers.etag, pinned.headers.etag);
+
+    const again = await t.app.inject({
+      method: "GET",
+      url: "/v/1?download=1",
+      headers: { ...draftHost(draft.slug), "if-none-match": String(pinned.headers.etag) },
+    });
+    assert.equal(again.statusCode, 304);
+  });
+
   it("enforces optimistic concurrency on new versions", async () => {
     const draft = (await createDraft(htmlDoc("occ"))).json<DraftBody>();
 

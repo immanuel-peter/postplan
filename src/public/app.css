@@ -1345,13 +1345,34 @@ code {
   font-size: 0.8125rem;
 }
 
+.versions-table .col-download {
+  width: 48px;
+  text-align: right;
+}
+
+.versions-table td.col-download {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 @media (max-width: 600px) {
   .versions-table .col-version {
     width: 72px;
   }
 
   .versions-table .col-time {
-    width: 150px;
+    width: 124px;
+  }
+
+  .versions-table th.col-download,
+  .versions-table td.col-download {
+    width: 32px;
+    padding-left: 0;
+    padding-right: 4px;
+  }
+
+  .versions-table .col-download .icon-btn {
+    padding: 0 0.375rem;
   }
 }
 
