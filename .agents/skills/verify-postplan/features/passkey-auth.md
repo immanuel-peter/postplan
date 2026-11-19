@@ -1,6 +1,6 @@
 # Passkey auth (dashboard gate)
 
-One passkey identity guards the dashboard (ADR 0008). No email, password, or signup. Drafts and Assets stay public. Only the apex dashboard is locked.
+One passkey identity guards the dashboard. No email, password, or signup. Drafts and Assets stay public. Only the apex dashboard is locked.
 
 ## Sub-features
 
