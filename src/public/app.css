@@ -1307,6 +1307,27 @@ code {
   color: var(--text);
 }
 
+@media (max-width: 480px) {
+  .nav {
+    gap: 1rem;
+  }
+
+  .nav-lock span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .nav-lock svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 /* === Drafts pages: page-specific additions go below this line === */
 
 .row-meta-version {
