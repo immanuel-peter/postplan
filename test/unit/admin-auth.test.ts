@@ -15,7 +15,7 @@ describe("relyingParty", () => {
     const rp = relyingParty(testConfig({ baseDomain: "postplan.domain", nodeEnv: "production" }));
     assert.deepEqual(rp, {
       id: "postplan.domain",
-      name: "PostPlan",
+      name: "Postplan",
       origin: "https://postplan.domain",
       secure: true,
     });

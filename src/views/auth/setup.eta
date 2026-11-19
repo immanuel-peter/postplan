@@ -2,7 +2,7 @@
 <% if (it.mode === "recovery") { %>
   <h1>Recover access</h1>
 <% } else { %>
-  <h1>Set up PostPlan</h1>
+  <h1>Set up Postplan</h1>
 <% } %>
 <% if (it.error) { %>
   <p class="alert-error"><%= it.error %></p>

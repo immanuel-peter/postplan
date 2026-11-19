@@ -208,7 +208,7 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       return reply.redirect("/unlock");
     }
     return reply.view("auth/setup", {
-      title: mode === "recovery" ? "Recover access" : "Set up PostPlan",
+      title: mode === "recovery" ? "Recover access" : "Set up Postplan",
       mode,
       error: null,
     });
@@ -232,7 +232,7 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     }
     if (!setupLimiter.check(clientKey(request))) {
       return reply.code(429).view("auth/setup", {
-        title: "Set up PostPlan",
+        title: "Set up Postplan",
         mode,
         error: "Too many attempts. Wait a few minutes and try again.",
       });
@@ -249,7 +249,7 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       )
     ) {
       return reply.code(400).view("auth/setup", {
-        title: mode === "recovery" ? "Recover access" : "Set up PostPlan",
+        title: mode === "recovery" ? "Recover access" : "Set up Postplan",
         mode,
         error: "That secret didn't match.",
       });

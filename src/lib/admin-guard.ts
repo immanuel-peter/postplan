@@ -17,6 +17,8 @@ const OPEN_PATHS = new Set([
   "/readyz",
   "/openapi.json",
   "/favicon.ico",
+  "/manifest.webmanifest",
+  "/sw.js",
   "/unlock",
   "/setup",
   "/auth/login/options",

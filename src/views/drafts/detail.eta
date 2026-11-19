@@ -135,7 +135,7 @@
     // Title and description: shown as text, edited in place. Without this script each form posts normally.
     function render(field, data) {
       if (field === "title") {
-        document.title = data.title + " · PostPlan";
+        document.title = data.title + " · Postplan";
         document.querySelector("[data-dialog-title]").textContent = data.title;
         return { text: data.title, empty: !data.titleValue, saved: data.titleValue };
       }

@@ -128,7 +128,7 @@ describe("dashboard drafts list", { skip: skipWithoutDb }, () => {
     assert.equal(bumped.statusCode, 201, bumped.body);
 
     const html = await page();
-    assert.match(html, /<title>Drafts · PostPlan<\/title>/);
+    assert.match(html, /<title>Drafts · Postplan<\/title>/);
     assert.match(html, /<h1>Drafts<\/h1>/);
     assert.doesNotMatch(html, /My drafts/);
     assert.doesNotMatch(html, /No repository/);

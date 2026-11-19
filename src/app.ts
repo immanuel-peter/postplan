@@ -12,7 +12,7 @@ import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
 import { registerAdminGuard } from "./lib/admin-guard.js";
 import { sha256Hex } from "./lib/hash.js";
-import { classifyHost } from "./lib/host.js";
+import { classifyHost, dashboardHostConstraint } from "./lib/host.js";
 import { MAX_HTML_BYTES } from "./lib/html.js";
 import { registerApiRoutes } from "./routes/api.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -61,7 +61,7 @@ export async function buildApp(deps: AppDeps) {
     openapi: {
       openapi: "3.1.0",
       info: {
-        title: "PostPlan API",
+        title: "Postplan API",
         version: "1.0.0",
         description: "Single-tenant HTML Draft publishing API",
       },
@@ -181,6 +181,31 @@ export async function buildApp(deps: AppDeps) {
   });
   app.get("/favicon.ico", async (_request, reply) => {
     return reply.type("image/x-icon").send(faviconIco);
+  });
+
+  const pngs = ["icon-192.png", "icon-512.png", "icon-maskable-512.png"];
+  for (const name of pngs) {
+    const png = readFileSync(join(here, "public", name));
+    app.get(`/static/${name}`, async (_request, reply) => {
+      return reply.type("image/png").send(png);
+    });
+  }
+
+  const offlineHtml = readFileSync(join(here, "public", "offline.html"), "utf8");
+  app.get("/static/offline.html", async (_request, reply) => {
+    return reply.type("text/html; charset=utf-8").send(offlineHtml);
+  });
+
+  const dashboardOnly = { constraints: { host: dashboardHostConstraint(deps.config.baseDomain) } };
+  const manifest = readFileSync(join(here, "public", "manifest.webmanifest"), "utf8");
+  app.get("/manifest.webmanifest", dashboardOnly, async (_request, reply) => {
+    return reply.type("application/manifest+json; charset=utf-8").send(manifest);
+  });
+
+  const offlineVersion = sha256Hex(Buffer.from(offlineHtml, "utf8")).slice(0, 12);
+  const serviceWorker = readFileSync(join(here, "public", "sw.js"), "utf8").replace("__OFFLINE_VERSION__", offlineVersion);
+  app.get("/sw.js", dashboardOnly, async (_request, reply) => {
+    return reply.type("text/javascript; charset=utf-8").header("Cache-Control", "no-cache").send(serviceWorker);
   });
 
   return app;

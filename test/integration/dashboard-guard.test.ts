@@ -3,7 +3,7 @@ import { after, before, describe, it } from "node:test";
 import { adminSetup } from "../../src/db/schema.js";
 import { hashToken } from "../../src/lib/tokens.js";
 import { authenticateSession, createSession } from "../../src/services/admin.js";
-import { apiHost, multipart, skipWithoutDb, startTestApp, type TestApp } from "../helpers/app.js";
+import { apiHost, draftHost, multipart, skipWithoutDb, startTestApp, type TestApp } from "../helpers/app.js";
 
 // relyingParty() treats a non-.localhost base domain in a non-development env as production,
 // so the session cookie uses the __Host- prefix and the only allowed origin is https://apex.
@@ -140,5 +140,32 @@ describe("dashboard guard", { skip: skipWithoutDb }, () => {
     });
     assert.equal(res.statusCode, 403);
     assert.equal(res.body, "bad csrf");
+  });
+  it("serves the PWA manifest, service worker, and icons without a session, on the dashboard host only", async () => {
+    const manifest = await t.app.inject({ method: "GET", url: "/manifest.webmanifest", headers: apiHost() });
+    assert.equal(manifest.statusCode, 200);
+    assert.match(manifest.headers["content-type"] ?? "", /^application\/manifest\+json/);
+    const body = manifest.json() as { start_url: string; display: string; icons: { src: string; sizes: string }[] };
+    assert.equal(body.start_url, "/");
+    assert.equal(body.display, "standalone");
+    for (const icon of body.icons) {
+      const res = await t.app.inject({ method: "GET", url: icon.src, headers: apiHost() });
+      assert.equal(res.statusCode, 200, icon.src);
+      assert.equal(res.headers["content-type"], "image/png");
+    }
+
+    const sw = await t.app.inject({ method: "GET", url: "/sw.js", headers: apiHost() });
+    assert.equal(sw.statusCode, 200);
+    assert.match(sw.headers["content-type"] ?? "", /^text\/javascript/);
+    assert.equal(sw.headers["cache-control"], "no-cache");
+    assert.match(sw.body, /const VERSION = "[0-9a-f]{12}"/);
+
+    const offline = await t.app.inject({ method: "GET", url: "/static/offline.html", headers: apiHost() });
+    assert.equal(offline.statusCode, 200);
+
+    for (const url of ["/manifest.webmanifest", "/sw.js"]) {
+      const res = await t.app.inject({ method: "GET", url, headers: draftHost("some-draft") });
+      assert.equal(res.statusCode, 404, url);
+    }
   });
 });
