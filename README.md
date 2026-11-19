@@ -54,10 +54,6 @@ Send a `POST` request to `/api/v1/drafts/{id}/versions` to append a new version:
 - Supply the `If-Match: "{version_number}"` header to confirm the target version.
 - The server stores the new version as `version_number + 1`.
 
-### Link previews
-
-Shared Draft links unfurl in Slack, iMessage, and X. Each Draft page gets Open Graph and Twitter card tags pointing at `https://{slug}.postplan.domain/og.png`, a 1200×630 card with the Draft's title, description, and version. Tags the HTML already declares win, so a Draft can ship its own `og:image`.
-
 ## Tests
 
 Tests use Node's built-in runner through `tsx` and drive the real app with Fastify's `inject()`, so they need no browser or open port. S3 is an in-memory fake (`test/helpers/fake-s3.ts`).

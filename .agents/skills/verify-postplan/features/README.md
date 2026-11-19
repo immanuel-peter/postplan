@@ -8,7 +8,7 @@ One file per user-facing feature. Each lists its sub-features, how a user reache
 |---|---|---|
 | `src/routes/api.ts` | publish-and-versions, assets, tokens (whichever handlers changed) | no |
 | `src/services/drafts.ts`, `src/lib/{multipart,slug,tokens,auth}.ts` | [publish-and-versions](publish-and-versions.md) | no |
-| `src/routes/public.ts`, `src/lib/{csp,host,html,link-preview,og-card}.ts` | [public-draft-serving](public-draft-serving.md) | no |
+| `src/routes/public.ts`, `src/lib/{csp,host,html}.ts` | [public-draft-serving](public-draft-serving.md) | no |
 | `src/routes/assets-public.ts`, `src/services/{assets,orphans}.ts`, `src/lib/{s3,thumbnails}.ts`, `src/views/assets/*` | [assets](assets.md) | for the dashboard sub-features |
 | `src/lib/search.ts` (`?q=` on both list endpoints) | publish-and-versions, assets | no |
 | `src/public/table-search.js` (live search on the Drafts and Assets lists) | dashboard-drafts, assets | yes |
