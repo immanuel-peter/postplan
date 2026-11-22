@@ -7,7 +7,7 @@ Single-tenant, self-hosted HTML publishing: a Fastify app that serves self-conta
 - Production: dashboard at `https://postplan.link`, Drafts at `https://{slug}.postplan.link`.
 - One app serves both host classes by host dispatch; deployed on Hostess (app, managed Postgres, private Garage S3, cloudflared tunnel — roster and config in `hostess.yml`).
 - Drafts hold append-only, gap-free Versions; a publish always creates the next number. Status is `active` (publicly served) or `deleted` (soft-deleted).
-- Dashboard is Eta SSR on the apex only, behind one passkey identity, no owner table. Draft hosts serve public HTML only, with a CSP that allows inline CSS/JS, images/media from the assets host, and `connect-src *`, plus link-preview meta tags and a `/og.png` card.
+- Dashboard is Eta SSR on the apex only, behind one passkey identity, no owner table. Draft hosts serve public HTML only, with a CSP that allows inline CSS/JS, fonts embedded as `data:` URIs, images/media from the assets host, and `connect-src *`, plus link-preview meta tags and a `/og.png` card.
 - API at `/api/v1` — live contract at `https://postplan.link/openapi.json`, `Authorization: Bearer pp_…` tokens.
 
 Product rules:

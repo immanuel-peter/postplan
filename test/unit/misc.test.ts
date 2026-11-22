@@ -13,12 +13,12 @@ import {
 
 describe("draftCsp", () => {
   it("is pinned; loosening it should be a deliberate change", () => {
-    assert.equal(SECURITY_POLICY_VERSION, 2);
+    assert.equal(SECURITY_POLICY_VERSION, 3);
     assert.equal(
       draftCsp("https://assets.postplan.domain"),
       "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
         "img-src 'self' data: blob: https://assets.postplan.domain; " +
-        "media-src 'self' data: blob: https://assets.postplan.domain; connect-src *; frame-ancestors 'none'",
+        "media-src 'self' data: blob: https://assets.postplan.domain; font-src data:; connect-src *; frame-ancestors 'none'",
     );
   });
 
