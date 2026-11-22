@@ -10,10 +10,10 @@ The job is one UTF-8 HTML file on disk, a styled report the user can later publi
 Write one self-contained HTML file. Self-contained means it is a complete document and it runs under the Draft CSP:
 
 ```
-default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://assets.<domain>; media-src 'self' data: blob: https://assets.<domain>; connect-src *; frame-ancestors 'none'
+default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://assets.<domain>; media-src 'self' data: blob: https://assets.<domain>; font-src data:; connect-src *; frame-ancestors 'none'
 ```
 
-So: CSS in `<style>`, JS in `<script>`, images and media via Asset URLs (`https://assets.<domain>/<id>.<ext>` after the asset-upload skill) or `data:`/`blob:`/`self`, `font-family` a system stack, `fetch()` to any origin allowed. Also: complete document (`<!doctype html>`, `<html>`, `<body>`), size ≤ 5 MiB.
+So: CSS in `<style>`, JS in `<script>`, images and media via Asset URLs (`https://assets.<domain>/<id>.<ext>` after the asset-upload skill) or `data:`/`blob:`/`self`, custom fonts only when embedded as a `data:` URI in `@font-face` (keep a system-font fallback in the stack; mind the 5 MiB limit — subset or use woff2), linked fonts such as Google Fonts blocked, `fetch()` to any origin allowed. Also: complete document (`<!doctype html>`, `<html>`, `<body>`), size ≤ 5 MiB.
 
 ## Apply report styling
 
