@@ -51,9 +51,9 @@ Done when the target is **create** plus a title, or a Draft `id` plus `currentVe
 Check the HTML file before publishing. Confirm every item holds:
 
 - UTF-8, complete document (`<!doctype html>`, `<html>`, `<body>`), size ≤ 5 MiB.
-- CSS lives in `<style>`, JS in `<script>`, `font-family` is a system stack.
+- CSS lives in `<style>`, JS in `<script>`. Custom fonts are allowed only when embedded as a `data:` URI in `@font-face` (keep a system-font fallback in the stack); linked fonts such as Google Fonts are blocked. Mind the 5 MiB limit — subset or use woff2.
 - Images and media use Asset URLs (`https://assets.<domain>/<id>.<ext>`), `data:`, `blob:`, or `self`.
-- The document runs under the Draft CSP: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://assets.<domain>; media-src 'self' data: blob: https://assets.<domain>; connect-src *; frame-ancestors 'none'`
+- The document runs under the Draft CSP: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: https://assets.<domain>; media-src 'self' data: blob: https://assets.<domain>; font-src data:; connect-src *; frame-ancestors 'none'`
 
 If the page needs an image, video, or similar file for ingress and render, use the `asset-upload` skill. Put the returned Asset URL in the HTML. Skip asset upload when the page has none.
 

@@ -8,7 +8,7 @@ Each active Draft is publicly served on its own subdomain: the latest Version at
 - `/v/{n}` → that Version, `Cache-Control: ... immutable`, no `Vary`, `ETag "<sha256>.<preview fingerprint>"`; unknown or non-numeric `n` → 404
 - Link previews: both pages get `og:*` and `twitter:card` meta tags inserted right after `<head>`, skipping any key the HTML already declares; every other byte is the stored Version. `og:image` points at `/og.png` (or `/v/{n}/og.png`), a 1200×630 PNG card: Postplan wordmark, `v{n}` chip, slug host pill, title (3 lines max), description (2 lines max). Card: `Content-Type: image/png`, `ETag "og-<hash>"`, 60 s cache. The fingerprint is a hash of title and description, so a title or description edit changes the page and card ETags without a new Version. An untitled Draft's card falls back to the HTML's `og:title`/`<title>`
 - Download: `?download=1` on `/` or `/v/{n}` (exactly `1`; `download=true` or `0` gets the normal page) → the stored bytes with no preview tags, `Content-Disposition: attachment; filename="{slug}-v{n}.html"`, `ETag "<sha256>.download"`, same Cache-Control as the page. A matching `If-None-Match` → 304, still carrying `Content-Disposition`. The dashboard's Download buttons link here (dashboard-drafts)
-- `Content-Security-Policy`: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: <assets origin>; media-src ...; connect-src *; frame-ancestors 'none'`
+- `Content-Security-Policy`: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: <assets origin>; media-src 'self' data: blob: <assets origin>; font-src data:; connect-src *; frame-ancestors 'none'`
 - Draft favicons: `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png` on the draft host
 - Any other path on a draft host → 404; deleted Draft → 404 at `/`, `/v/{n}`, `?download=1`, `/og.png`, and `/v/{n}/og.png`
 - Host dispatch: dashboard routes (`/keys`, `/api/v1/...`, `/sw.js`) are not reachable on a draft host
@@ -42,13 +42,14 @@ Pass when: 10 and 11 carry the `.<fingerprint>` ETags and the injected `<meta pr
 
 For a title edit, `PATCH /api/v1/drafts/$ID` with a new `title` (or edit it on the dashboard), then repeat 10 and 16 with the old ETags as `If-None-Match`: both must be 200 with new ETags. For a Draft that declares its own `og:image`, the served HTML keeps it and gains no `og:image:*` tags.
 
-For CSP behavior (not just the header), publish HTML with an inline `<script>` that writes to the DOM plus an `<img src="https://example.com/x.png">`. Then `browser_navigate` to `$D/`, `browser_take_screenshot`, and `browser_console_messages`: the script runs and the external image is blocked by CSP.
+For CSP behavior (not just the header), publish HTML with an inline `<script>` that writes to the DOM, an `<img src="https://example.com/x.png">`, and two `@font-face` rules used on the page: one `data:font/woff2;base64,…` (e.g. a font from `node_modules/@ibm/plex-mono/fonts/complete/woff2/`) and one external URL (`https://example.com/font.woff2`). Open `$D/` in the browser, wait for `document.fonts.ready`, and check `document.fonts` plus a screenshot: the script runs, the `data:` font is `loaded`, and both the external font (`error`) and external image are blocked.
 
 After delete (`DELETE /api/v1/drafts/$ID`): `$D/`, `$D/v/1`, `$D/?download=1`, `$D/og.png`, `$D/v/1/og.png` → 404.
 
 ## Gotchas
 
 - `req.sh` prints the CSP, ETag, Vary and Content-Disposition lines. Diff the CSP against `src/lib/csp.ts` `draftCsp()` when that file changed.
+- `agent-browser console`/`errors` omit CSP violations; verify blocking via `document.fonts` and `agent-browser network requests` (blocked requests have no status).
 - 15 and 19d are 304 with an empty body.
 - `/og.png` on the apex redirects to `/unlock` (dashboard catch-all) and 404s on the assets host. Only draft hosts serve cards.
 - Browsers cache `/v/{n}` as immutable, even though its preview tags and ETag change when the title or description is edited. Use curl for header checks and a fresh Playwright page for rendering.

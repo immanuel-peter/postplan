@@ -1,7 +1,7 @@
-export const SECURITY_POLICY_VERSION = 2;
+export const SECURITY_POLICY_VERSION = 3;
 
 export function draftCsp(assetOrigin: string): string {
-  return `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: ${assetOrigin}; media-src 'self' data: blob: ${assetOrigin}; connect-src *; frame-ancestors 'none'`;
+  return `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: ${assetOrigin}; media-src 'self' data: blob: ${assetOrigin}; font-src data:; connect-src *; frame-ancestors 'none'`;
 }
 
 export const ASSET_DOCUMENT_CSP = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox";
