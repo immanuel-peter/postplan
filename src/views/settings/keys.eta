@@ -1,12 +1,12 @@
-<% layout("../layouts/main") %>
-<h1>API keys</h1>
+<% layout("../layouts/settings") %>
+<h2>API keys</h2>
 <% if (it.error) { %>
   <p class="form-error"><%= it.error %></p>
 <% } %>
 <section class="panel" aria-labelledby="new-key-title">
   <div class="panel-body">
-    <h2 id="new-key-title">New key</h2>
-    <form class="generate-form" method="post" action="/keys">
+    <h3 id="new-key-title">New key</h3>
+    <form class="generate-form" method="post" action="/settings/keys">
       <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
       <div class="field">
         <label for="name">Name</label>
@@ -42,7 +42,7 @@
 <section class="panel" aria-labelledby="keys-title">
   <div class="panel-head">
     <div class="panel-title">
-      <h2 id="keys-title">Keys</h2>
+      <h3 id="keys-title">Keys</h3>
       <span class="panel-count"><%= it.tokens.length %></span>
     </div>
   </div>
@@ -75,7 +75,7 @@
             <% if (token.lastUsedIso) { %><time datetime="<%= token.lastUsedIso %>" data-local><%= token.lastUsedLabel %></time><% } else { %>Never<% } %>
           </td>
           <td class="col-action">
-            <form method="post" action="/keys/<%= token.id %>/revoke" data-confirm-name="<%= token.name %>" data-confirm-prefix="<%= token.prefix %>">
+            <form method="post" action="/settings/keys/<%= token.id %>/revoke" data-confirm-name="<%= token.name %>" data-confirm-prefix="<%= token.prefix %>">
               <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
               <button class="btn btn-sm btn-danger-soft" type="submit" aria-label="Revoke <%= token.name %>">Revoke</button>
             </form>

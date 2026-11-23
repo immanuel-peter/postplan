@@ -31,7 +31,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
   }
 
   async function getKeys(cookie: string) {
-    const res = await t.app.inject({ method: "GET", url: "/keys", headers: { ...apiHost(), cookie } });
+    const res = await t.app.inject({ method: "GET", url: "/settings/keys", headers: { ...apiHost(), cookie } });
     assert.equal(res.statusCode, 200, res.body);
     return res.body;
   }
@@ -51,7 +51,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
   }
 
   function revokeAction(html: string, name: string): string {
-    const action = new RegExp(`action="(/keys/[^"/]+/revoke)" data-confirm-name="${name}"`).exec(html)?.[1];
+    const action = new RegExp(`action="(/settings/keys/[^"/]+/revoke)" data-confirm-name="${name}"`).exec(html)?.[1];
     assert.ok(action, `no revoke form for ${name}`);
     return action;
   }
@@ -60,15 +60,17 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
     const { cookie } = await session();
     const html = await getKeys(cookie);
 
-    assert.match(html, /<h1>API keys<\/h1>/);
+    assert.match(html, /<h1 class="settings-heading">Settings<\/h1>/);
+    assert.match(html, /<a href="\/settings\/keys" aria-current="page">/);
+    assert.match(html, /<h2>API keys<\/h2>/);
     assert.doesNotMatch(html, /class="lede"/);
     assert.doesNotMatch(html, /Authorization: Bearer/);
-    assert.match(html, /<h2 id="new-key-title">New key<\/h2>/);
+    assert.match(html, /<h3 id="new-key-title">New key<\/h3>/);
     assert.match(html, /placeholder="e\.g\. CI script"/);
     assert.doesNotMatch(html, /API · UTC stamp/);
     assert.match(html, /Keys are shown once\./);
     assert.doesNotMatch(html, /Each visit can mint a fresh key/);
-    assert.match(html, /<h2 id="keys-title">Keys<\/h2>\s*<span class="panel-count">1<\/span>/);
+    assert.match(html, /<h3 id="keys-title">Keys<\/h3>\s*<span class="panel-count">1<\/span>/);
     assert.doesNotMatch(html, /Active keys/);
     assert.match(html, /<table class="data-table">/);
     assert.match(html, /<span class="sr-only">Actions<\/span>/);
@@ -103,7 +105,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
 
     assert.match(
       html,
-      /<form method="post" action="\/keys\/[^"/]+\/revoke" data-confirm-name="bootstrap" data-confirm-prefix="pp_[^"]+">/,
+      /<form method="post" action="\/settings\/keys\/[^"/]+\/revoke" data-confirm-name="bootstrap" data-confirm-prefix="pp_[^"]+">/,
     );
     assert.match(
       html,
@@ -120,7 +122,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
   it("generates a key, shows it once inside the New key panel, and revokes it by POST", async () => {
     const { cookie, csrf } = await session();
 
-    const created = await postForm("/keys", cookie, { _csrf: csrf, name: "CI script" });
+    const created = await postForm("/settings/keys", cookie, { _csrf: csrf, name: "CI script" });
     assert.equal(created.statusCode, 200, created.body);
     assert.match(
       created.body,
@@ -132,7 +134,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
     const action = revokeAction(await getKeys(cookie), "CI script");
     const revoked = await postForm(action, cookie, { _csrf: csrf });
     assert.equal(revoked.statusCode, 302);
-    assert.equal(revoked.headers.location, "/keys");
+    assert.equal(revoked.headers.location, "/settings/keys");
 
     const after = await getKeys(cookie);
     assert.doesNotMatch(after, /CI script<\/div>/);
@@ -141,7 +143,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
 
   it("escapes key names in the confirm data attributes", async () => {
     const { cookie, csrf } = await session();
-    await postForm("/keys", cookie, { _csrf: csrf, name: `"><img src=x onerror=alert(1)>` });
+    await postForm("/settings/keys", cookie, { _csrf: csrf, name: `"><img src=x onerror=alert(1)>` });
     const html = await getKeys(cookie);
     assert.doesNotMatch(html, /<img src=x/);
     assert.match(html, /data-confirm-name="&quot;&gt;&lt;img src=x onerror=alert\(1\)&gt;"/);
@@ -150,7 +152,7 @@ describe("dashboard API keys page", { skip: skipWithoutDb }, () => {
   it("shows the empty row once every key is revoked", async () => {
     const { cookie, csrf } = await session();
     let html = await getKeys(cookie);
-    for (const [, action] of html.matchAll(/action="(\/keys\/[^"/]+\/revoke)"/g)) {
+    for (const [, action] of html.matchAll(/action="(\/settings\/keys\/[^"/]+\/revoke)"/g)) {
       assert.ok(action);
       const res = await postForm(action, cookie, { _csrf: csrf });
       assert.equal(res.statusCode, 302);

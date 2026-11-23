@@ -19,11 +19,11 @@ while read -r f; do
     src/lib/search.ts) add publish-and-versions; add assets ;;
     src/public/table-search.js) add dashboard-drafts; add assets ;;
     src/views/assets/*) add assets ;;
-    src/services/tokens.ts|src/views/tokens/*) add tokens ;;
-    src/routes/dashboard.ts|src/views/drafts/*|src/views/layouts/main.eta|src/public/app.css|src/public/localtime.js|src/lib/time.ts|src/public/sw.js|src/public/manifest.webmanifest|src/public/offline.html) add dashboard-drafts ;;
+    src/services/tokens.ts|src/views/settings/keys.eta) add tokens ;;
+    src/routes/dashboard.ts|src/views/drafts/*|src/views/layouts/main.eta|src/views/layouts/settings.eta|src/views/settings/appearance.eta|src/lib/theme.ts|src/public/app.css|src/public/localtime.js|src/lib/time.ts|src/public/sw.js|src/public/manifest.webmanifest|src/public/offline.html) add dashboard-drafts ;;
     src/lib/request.ts) add publish-and-versions; add public-draft-serving; add assets; add "the dashboard feature whose handler uses the changed helper" ;;
     test/*|tsconfig.test.json|.github/*) add "none (npm run typecheck + npm test cover it)" ;;
-    src/routes/auth.ts|src/lib/admin-*|src/services/admin.ts|src/public/webauthn.js|src/views/auth/*|src/views/layouts/auth.eta) add passkey-auth ;;
+    src/routes/auth.ts|src/lib/admin-*|src/services/admin.ts|src/public/webauthn.js|src/views/auth/*|src/views/settings/security.eta|src/views/layouts/auth.eta) add passkey-auth ;;
     drizzle/*|src/db/*) add "migrations (doctor) + every feature touching the changed tables" ;;
     compose.yaml|Dockerfile|src/config.ts|src/server.ts|src/app.ts|package*.json) add "launch + doctor, then publish-and-versions as a smoke" ;;
   esac

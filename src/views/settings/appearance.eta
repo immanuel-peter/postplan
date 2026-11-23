@@ -1,0 +1,64 @@
+<% layout("../layouts/settings") %>
+<% const mini = (themeClass) => `<span class="theme-mini ${themeClass}"><span class="theme-mini-nav"><i></i><i></i><i></i></span><span class="theme-mini-panel"><span class="theme-mini-row is-favorite"><b></b><i></i></span><span class="theme-mini-row"><b></b><i></i></span></span></span>` %>
+<h2>Appearance</h2>
+<section class="panel" aria-labelledby="theme-title">
+  <div class="panel-head">
+    <h3 id="theme-title">Theme</h3>
+  </div>
+  <form method="post" action="/settings/appearance" id="theme-form">
+    <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
+    <fieldset class="theme-options">
+      <legend class="sr-only">Theme</legend>
+      <% for (const option of it.options) { %>
+        <label class="theme-option">
+          <input type="radio" name="theme" value="<%= option.value %>"<% if (option.value === it.theme) { %> checked<% } %> />
+          <span class="theme-preview" aria-hidden="true">
+            <% if (option.value === "system") { %>
+              <span class="theme-preview-half"><%~ mini("theme-light") %></span>
+              <span class="theme-preview-half"><%~ mini("theme-dark") %></span>
+            <% } else { %>
+              <%~ mini(`theme-${option.value}`) %>
+            <% } %>
+          </span>
+          <span class="theme-option-label">
+            <span class="theme-radio" aria-hidden="true"></span>
+            <span>
+              <span class="theme-option-name"><%= option.label %></span>
+              <span class="theme-option-hint"><%= option.hint %></span>
+            </span>
+          </span>
+        </label>
+      <% } %>
+    </fieldset>
+    <noscript>
+      <p class="panel-foot"><button class="btn btn-dark btn-sm" type="submit">Save</button></p>
+    </noscript>
+  </form>
+</section>
+<script>
+  (function () {
+    var form = document.getElementById("theme-form");
+    if (!form || !window.fetch) return;
+    form.addEventListener("change", function () {
+      var data = new FormData(form);
+      var theme = data.get("theme");
+      if (theme === "light" || theme === "dark") {
+        document.documentElement.setAttribute("data-theme", theme);
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
+      fetch(form.action, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        credentials: "same-origin",
+        body: new URLSearchParams(data),
+      })
+        .then(function (response) {
+          if (!response.ok) form.submit();
+        })
+        .catch(function () {
+          form.submit();
+        });
+    });
+  })();
+</script>

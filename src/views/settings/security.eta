@@ -1,11 +1,10 @@
-<% layout("../layouts/main") %>
-<h1>Security</h1>
-<p class="lede">Passkeys that can unlock this dashboard, and the browsers currently signed in.</p>
+<% layout("../layouts/settings") %>
+<h2>Security</h2>
 <p class="alert-error" id="passkey-error"<% if (!it.error) { %> hidden<% } %>><%= it.error ?? "" %></p>
 
 <section class="panel" aria-labelledby="passkeys-title">
   <div class="panel-head">
-    <h2 id="passkeys-title">Passkeys</h2>
+    <h3 id="passkeys-title">Passkeys</h3>
     <button class="btn btn-dark" type="button" id="add-passkey">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
         <path d="M12 5v14" />
@@ -43,7 +42,7 @@
           </td>
           <td class="col-action">
             <% if (it.removable) { %>
-              <form method="post" action="/security/passkeys/<%= passkey.id %>/delete">
+              <form method="post" action="/settings/security/passkeys/<%= passkey.id %>/delete">
                 <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
                 <button class="btn btn-sm btn-danger-soft" type="submit" aria-label="Remove <%= passkey.name %>">Remove</button>
               </form>
@@ -58,8 +57,8 @@
 
 <section class="panel" aria-labelledby="sessions-title">
   <div class="panel-head">
-    <h2 id="sessions-title">Sessions</h2>
-    <form method="post" action="/security/sessions/revoke-all">
+    <h3 id="sessions-title">Sessions</h3>
+    <form method="post" action="/settings/security/sessions/revoke-all">
       <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
       <button class="btn btn-danger" type="submit">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -96,7 +95,7 @@
           </td>
           <td class="col-action">
             <% if (!session.current) { %>
-              <form method="post" action="/security/sessions/<%= session.id %>/revoke">
+              <form method="post" action="/settings/security/sessions/<%= session.id %>/revoke">
                 <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
                 <button class="btn btn-sm btn-danger-soft" type="submit" aria-label="Revoke <%= session.label %>">Revoke</button>
               </form>

@@ -13,11 +13,11 @@ One file per user-facing feature. Each lists its sub-features, how a user reache
 | `src/lib/search.ts` (`?q=` on both list endpoints) | publish-and-versions, assets | no |
 | `src/public/table-search.js` (live search on the Drafts and Assets lists) | dashboard-drafts, assets | yes |
 | `src/routes/dashboard.ts`, `src/views/drafts/*`, `src/views/layouts/main.eta`, `src/public/{app.css,localtime.js}`, `src/lib/time.ts`, `src/public/{sw.js,manifest.webmanifest,offline.html}` (installable dashboard) | [dashboard-drafts](dashboard-drafts.md) | yes |
-| `src/services/tokens.ts`, `src/views/tokens/*` | [tokens](tokens.md) | for `/keys` |
+| `src/services/tokens.ts`, `src/views/settings/keys.eta` | [tokens](tokens.md) | for `/settings/keys` |
 | `src/routes/auth.ts`, `src/lib/admin-*`, `src/services/admin.ts`, `src/public/webauthn.js`, `src/views/auth/*` | [passkey-auth](passkey-auth.md) | yes; auth is the subject |
 | `src/lib/request.ts` (shared request helpers used by every route file) | publish-and-versions, public-draft-serving, assets, plus the dashboard feature whose handler uses the changed helper | depends |
 | `test/*`, `tsconfig.test.json`, `.github/*` | none: `npm run typecheck` + `npm test` cover it | no |
 | `drizzle/*`, `src/db/*` | doctor's migration check + every feature touching the changed tables | depends |
 | `compose.yaml`, `Dockerfile`, `src/{config,server,app}.ts`, `package*.json` | launch + doctor, then publish-and-versions as a smoke | no |
 
-`src/routes/dashboard.ts` also serves `/keys` and `/assets`. Check which handlers the diff touched.
+`src/routes/dashboard.ts` also serves `/settings/keys`, `/settings/appearance`, and `/assets`. Check which handlers the diff touched.

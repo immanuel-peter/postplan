@@ -521,12 +521,19 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
     if (!isDashboardHostKind(request.hostKind.kind)) {
       return;
     }
+    return reply.redirect("/settings/security", 301);
+  });
+
+  app.get("/settings/security", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHostKind(request.hostKind.kind)) {
+      return;
+    }
     noStore(reply);
-    return reply.view("auth/security", await securityViewModel(deps, request));
+    return reply.view("settings/security", await securityViewModel(deps, request));
   });
 
   app.post<{ Params: IdParams }>(
-    "/security/passkeys/:id/delete",
+    "/settings/security/passkeys/:id/delete",
     dashboardOnly,
     async (request, reply) => {
       if (!isDashboardHostKind(request.hostKind.kind)) {
@@ -538,17 +545,17 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       }
       if (removed === "last_credential") {
         noStore(reply);
-        return reply.code(409).view("auth/security", {
+        return reply.code(409).view("settings/security", {
           ...(await securityViewModel(deps, request)),
           error: "That is your only passkey. Add another one before removing it.",
         });
       }
-      return reply.redirect("/security");
+      return reply.redirect("/settings/security");
     },
   );
 
   app.post<{ Params: IdParams }>(
-    "/security/sessions/:id/revoke",
+    "/settings/security/sessions/:id/revoke",
     dashboardOnly,
     async (request, reply) => {
       if (!isDashboardHostKind(request.hostKind.kind)) {
@@ -559,11 +566,11 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
         reply.header("Set-Cookie", clearCookie(sessionCookie, rp.secure));
         return reply.redirect("/unlock");
       }
-      return reply.redirect("/security");
+      return reply.redirect("/settings/security");
     },
   );
 
-  app.post("/security/sessions/revoke-all", dashboardOnly, async (request, reply) => {
+  app.post("/settings/security/sessions/revoke-all", dashboardOnly, async (request, reply) => {
     if (!isDashboardHostKind(request.hostKind.kind)) {
       return;
     }
@@ -584,7 +591,8 @@ async function securityViewModel(
   ]);
   return {
     title: "Security",
-    active: "security",
+    active: "settings",
+    tab: "security",
     csrf: request.adminCsrf,
     error: null,
     // The last passkey cannot be removed, so the page does not offer it.
