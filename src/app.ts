@@ -10,10 +10,12 @@ import Fastify from "fastify";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
+import { relyingParty } from "./lib/admin-auth.js";
 import { registerAdminGuard } from "./lib/admin-guard.js";
 import { sha256Hex } from "./lib/hash.js";
 import { classifyHost, dashboardHostConstraint } from "./lib/host.js";
 import { MAX_HTML_BYTES } from "./lib/html.js";
+import { readTheme, themeCookieName } from "./lib/theme.js";
 import { registerApiRoutes } from "./routes/api.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerAssetPublicRoutes } from "./routes/assets-public.js";
@@ -40,6 +42,10 @@ declare module "fastify" {
     apiToken: TokenRecord | null;
     adminSession: SessionRecord | null;
     adminCsrf: string | null;
+  }
+  interface FastifyReply {
+    /** Merged into every `reply.view` by @fastify/view, which leaves it untyped. */
+    locals: Record<string, unknown>;
   }
 }
 
@@ -133,6 +139,11 @@ export async function buildApp(deps: AppDeps) {
     if (request.hostKind.kind === "reject") {
       return reply.code(404).type("text/plain").send("not found");
     }
+  });
+
+  const themeCookie = themeCookieName(relyingParty(deps.config));
+  app.addHook("onRequest", async (request, reply) => {
+    reply.locals = { ...reply.locals, theme: readTheme(request.headers.cookie, themeCookie) };
   });
 
   registerAdminGuard(app, deps);

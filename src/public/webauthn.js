@@ -102,5 +102,5 @@ async function postplanEnroll(options, name, csrf) {
       },
     },
   });
-  window.location.assign(csrf ? "/security" : "/");
+  window.location.assign(csrf ? "/settings/security" : "/");
 }

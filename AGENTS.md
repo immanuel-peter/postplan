@@ -16,7 +16,7 @@ Product rules:
 - Repository name/URL, git ref, and git commit are set atomically via the API — never dashboard edit fields.
 - Tokens are master keys: no granular scope or permission pickers in the dashboard.
 
-UI taste: light theme, warm off-white `#f6f5f2`, IBM Plex Sans/Mono; no dark mode. The only login chrome is the passkey unlock/setup gate — no email, password, or signup anywhere. Inspiration in `images/`.
+UI taste: warm off-white `#f6f5f2` light theme and warm charcoal `#161513` dark theme, IBM Plex Sans/Mono. Settings › Appearance picks Light, Dark, or System (cookie, default System); new colors go in both token sets in `app.css`. The only login chrome is the passkey unlock/setup gate — no email, password, or signup anywhere. Inspiration in `images/`.
 
 TypeScript: NodeNext + `verbatimModuleSyntax` — local imports use `.js` extensions.
 

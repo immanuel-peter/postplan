@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"<% if (it.theme === "light" || it.theme === "dark") { %> data-theme="<%= it.theme %>"<% } %>>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,7 +15,12 @@
     <link rel="icon" href="/static/favicon.ico" />
     <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#f6f5f2" />
+    <% if (it.theme === "light" || it.theme === "dark") { %>
+    <meta name="theme-color" content="<%= it.theme === "dark" ? "#161513" : "#f6f5f2" %>" />
+    <% } else { %>
+    <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)" />
+    <% } %>
     <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
     <script src="/static/localtime.js" defer></script>
   </head>
@@ -24,8 +29,7 @@
       <nav class="nav" aria-label="Dashboard">
         <a href="/" class="<%= it.active === 'drafts' ? 'active' : '' %>">Drafts</a>
         <a href="/assets" class="<%= it.active === 'assets' ? 'active' : '' %>">Assets</a>
-        <a href="/keys" class="<%= it.active === 'keys' ? 'active' : '' %>">API keys</a>
-        <a href="/security" class="<%= it.active === 'security' ? 'active' : '' %>">Security</a>
+        <a href="/settings" class="<%= it.active === 'settings' ? 'active' : '' %>">Settings</a>
         <form class="nav-lock-form" method="post" action="/lock">
           <input type="hidden" name="_csrf" value="<%= it.csrf %>" />
           <button class="nav-lock" type="submit" title="Lock">

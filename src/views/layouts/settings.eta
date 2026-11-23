@@ -1,0 +1,31 @@
+<% layout("./main") %>
+<h1 class="settings-heading">Settings</h1>
+<div class="settings-layout">
+  <nav class="settings-nav" aria-label="Settings">
+    <a href="/settings/keys"<% if (it.tab === "keys") { %> aria-current="page"<% } %>>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="7.5" cy="15.5" r="4.5" />
+        <path d="m10.7 12.3 9.3-9.3" />
+        <path d="m16 7 3 3" />
+        <path d="m19 4 2 2" />
+      </svg>
+      <span>API keys</span>
+    </a>
+    <a href="/settings/security"<% if (it.tab === "security") { %> aria-current="page"<% } %>>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z" />
+      </svg>
+      <span>Security</span>
+    </a>
+    <a href="/settings/appearance"<% if (it.tab === "appearance") { %> aria-current="page"<% } %>>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor" />
+      </svg>
+      <span>Appearance</span>
+    </a>
+  </nav>
+  <div class="settings-content">
+    <%~ it.body %>
+  </div>
+</div>

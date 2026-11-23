@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
+import { relyingParty, serializeCookie } from "../lib/admin-auth.js";
 import { dashboardHostConstraint, isDashboardHostKind } from "../lib/host.js";
+import { parseTheme, THEME_COOKIE_MAX_AGE, THEMES, themeCookieName, type Theme } from "../lib/theme.js";
 import { formatStamp, isoStamp, shortCommit } from "../lib/time.js";
 import { hashesEqual } from "../lib/tokens.js";
 import {
@@ -328,6 +330,12 @@ async function loadActiveDrafts(db: AppDeps["db"]): Promise<DraftRecord[]> {
   return items;
 }
 
+const THEME_LABELS: Record<Theme, { label: string; hint: string }> = {
+  light: { label: "Light", hint: "Warm off-white" },
+  dark: { label: "Dark", hint: "Warm charcoal" },
+  system: { label: "System", hint: "Follows your OS setting" },
+};
+
 async function renderKeys(
   reply: FastifyReply,
   deps: AppDeps,
@@ -343,9 +351,10 @@ async function renderKeys(
     lastUsedLabel: formatStamp(token.lastUsedAt),
     lastUsedIso: isoStamp(token.lastUsedAt),
   }));
-  return reply.view("tokens/list", {
+  return reply.view("settings/keys", {
     title: "API keys",
-    active: "keys",
+    active: "settings",
+    tab: "keys",
     csrf: extra.csrf,
     tokens: rows,
     secret: extra.secret,
@@ -456,14 +465,28 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return reply.redirect("/");
   });
 
+  app.get("/settings", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    return reply.redirect("/settings/keys");
+  });
+
   app.get("/keys", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    return reply.redirect("/settings/keys", 301);
+  });
+
+  app.get("/settings/keys", dashboardOnly, async (request, reply) => {
     if (!isDashboardHost(request)) {
       return;
     }
     return renderKeys(reply, deps, { secret: null, error: null, csrf: request.adminCsrf });
   });
 
-  app.post("/keys", dashboardOnly, async (request, reply) => {
+  app.post("/settings/keys", dashboardOnly, async (request, reply) => {
     if (!isDashboardHost(request)) {
       return;
     }
@@ -476,7 +499,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     return renderKeys(reply, deps, { secret: created.secret, error: null, csrf: request.adminCsrf });
   });
 
-  app.post<{ Params: IdParams }>("/keys/:id/revoke", dashboardOnly, async (request, reply) => {
+  app.post<{ Params: IdParams }>("/settings/keys/:id/revoke", dashboardOnly, async (request, reply) => {
     if (!isDashboardHost(request)) {
       return;
     }
@@ -484,7 +507,38 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     if (isServiceError(revoked)) {
       return reply.code(404).type("text/plain").send("not found");
     }
-    return reply.redirect("/keys");
+    return reply.redirect("/settings/keys");
+  });
+
+  const themeCookie = themeCookieName(relyingParty(deps.config));
+  const secureCookies = relyingParty(deps.config).secure;
+
+  app.get("/settings/appearance", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    return reply.view("settings/appearance", {
+      title: "Appearance",
+      active: "settings",
+      tab: "appearance",
+      csrf: request.adminCsrf,
+      options: THEMES.map((value) => ({ value, ...THEME_LABELS[value] })),
+    });
+  });
+
+  app.post("/settings/appearance", dashboardOnly, async (request, reply) => {
+    if (!isDashboardHost(request)) {
+      return;
+    }
+    const theme = parseTheme(readField(request.body, "theme"));
+    if (theme === null) {
+      return reply.code(400).type("text/plain").send("unknown theme");
+    }
+    reply.header("Set-Cookie", serializeCookie(themeCookie, theme, { maxAge: THEME_COOKIE_MAX_AGE, secure: secureCookies }));
+    if (request.headers.accept === "application/json") {
+      return reply.code(204).send();
+    }
+    return reply.redirect("/settings/appearance");
   });
 
   app.get<{ Querystring: { deleted?: unknown } }>("/assets", dashboardOnly, async (request, reply) => {

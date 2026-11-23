@@ -48,7 +48,7 @@ describe("security and unlock pages", { skip: skipWithoutDb }, () => {
   }
 
   async function getSecurity(cookie: string) {
-    const res = await t.app.inject({ method: "GET", url: "/security", headers: { ...apiHost(), cookie } });
+    const res = await t.app.inject({ method: "GET", url: "/settings/security", headers: { ...apiHost(), cookie } });
     assert.equal(res.statusCode, 200, res.body);
     return res.body;
   }
@@ -80,8 +80,9 @@ describe("security and unlock pages", { skip: skipWithoutDb }, () => {
     const { cookie } = await session();
     const html = await getSecurity(cookie);
 
-    assert.match(html, /<h1>Security<\/h1>/);
-    assert.match(html, /<p class="lede">Passkeys that can unlock this dashboard/);
+    assert.match(html, /<a href="\/settings\/security" aria-current="page">/);
+    assert.match(html, /<h2>Security<\/h2>/);
+    assert.doesNotMatch(html, /class="lede"/);
     assert.match(html, /<p class="alert-error" id="passkey-error" hidden><\/p>/);
     assert.match(html, /<div class="cell-title">MacBook Pro<\/div>/);
     assert.doesNotMatch(html, /internal/);
@@ -137,7 +138,7 @@ describe("security and unlock pages", { skip: skipWithoutDb }, () => {
     assert.match(html, /<div class="row-meta">\s*Expires <time datetime="[^"]+" data-local>in 7 days<\/time>/);
     assert.match(
       html,
-      /<form method="post" action="\/security\/sessions\/revoke-all">\s*<input type="hidden" name="_csrf" value="[^"]+" \/>\s*<button class="btn btn-danger" type="submit">\s*<svg[\s\S]*?<\/svg>\s*<span>Sign out everywhere<\/span>/,
+      /<form method="post" action="\/settings\/security\/sessions\/revoke-all">\s*<input type="hidden" name="_csrf" value="[^"]+" \/>\s*<button class="btn btn-danger" type="submit">\s*<svg[\s\S]*?<\/svg>\s*<span>Sign out everywhere<\/span>/,
     );
     assert.doesNotMatch(html, /class="link-button"/);
     assert.match(html, /<time datetime="\d{4}-\d\d-\d\dT[^"]+Z" data-local>in 7 days<\/time>/);
@@ -145,34 +146,34 @@ describe("security and unlock pages", { skip: skipWithoutDb }, () => {
 
     // The current session has an empty action cell; the other one can be revoked.
     assert.match(html, /<span class="chip-dirty">This device<\/span>/);
-    assert.doesNotMatch(html, new RegExp(`/security/sessions/${current.id}/revoke`));
+    assert.doesNotMatch(html, new RegExp(`/settings/security/sessions/${current.id}/revoke`));
     assert.match(
       html,
       new RegExp(
-        `action="/security/sessions/${other.id}/revoke">\\s*<input type="hidden" name="_csrf" value="[^"]+" />\\s*` +
+        `action="/settings/security/sessions/${other.id}/revoke">\\s*<input type="hidden" name="_csrf" value="[^"]+" />\\s*` +
           `<button class="btn btn-sm btn-danger-soft" type="submit" aria-label="Revoke Firefox · macOS">Revoke</button>`,
       ),
     );
 
     const revoked = await t.app.inject({
       method: "POST",
-      url: `/security/sessions/${other.id}/revoke`,
+      url: `/settings/security/sessions/${other.id}/revoke`,
       headers: { ...apiHost(), cookie: current.cookie, origin: ORIGIN },
       payload: { _csrf: current.csrf },
     });
     assert.equal(revoked.statusCode, 302);
-    assert.equal(revoked.headers.location, "/security");
+    assert.equal(revoked.headers.location, "/settings/security");
     assert.doesNotMatch(await getSecurity(current.cookie), new RegExp(other.id));
 
     const everywhere = await t.app.inject({
       method: "POST",
-      url: "/security/sessions/revoke-all",
+      url: "/settings/security/sessions/revoke-all",
       headers: { ...apiHost(), cookie: current.cookie, origin: ORIGIN },
       payload: { _csrf: current.csrf },
     });
     assert.equal(everywhere.statusCode, 302);
     assert.equal(everywhere.headers.location, "/unlock");
-    const locked = await t.app.inject({ method: "GET", url: "/security", headers: { ...apiHost(), cookie: current.cookie } });
+    const locked = await t.app.inject({ method: "GET", url: "/settings/security", headers: { ...apiHost(), cookie: current.cookie } });
     assert.equal(locked.statusCode, 302);
   });
 });
