@@ -7,7 +7,7 @@ services:
     type: postgres
     resources:
       preset: medium
-      storage: 20Gi
+      storage: 40Gi
     backups:
       schedule: daily
       retention: 14
