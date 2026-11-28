@@ -10,7 +10,8 @@ Each active Draft is publicly served on its own subdomain: the latest Version at
 - Download: `?download=1` on `/` or `/v/{n}` (exactly `1`; `download=true` or `0` gets the normal page) → the stored bytes with no preview tags, `Content-Disposition: attachment; filename="{slug}-v{n}.html"`, `ETag "<sha256>.download"`, same Cache-Control as the page. A matching `If-None-Match` → 304, still carrying `Content-Disposition`. The dashboard's Download buttons link here (dashboard-drafts)
 - `Content-Security-Policy`: `default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob: <assets origin>; media-src 'self' data: blob: <assets origin>; font-src data:; connect-src *; frame-ancestors 'none'`
 - Draft favicons: `/favicon.ico`, `/favicon.svg`, `/apple-touch-icon.png` on the draft host
-- Any other path on a draft host → 404; deleted Draft → 404 at `/`, `/v/{n}`, `?download=1`, `/og.png`, and `/v/{n}/og.png`
+- Any other path on a draft host → 404; deleted Draft → 410 at `/`, `/v/{n}`, `?download=1`, `/og.png`, and `/v/{n}/og.png`
+- Error pages (`src/lib/errors.ts`): every 404/410/5xx on a draft, asset, or dashboard host is the "Quiet" page (brand, host, one `<h1>`, buttons) with its own strict CSP (`script-src 'sha256-…'`, Plex from Google Fonts), `Cache-Control: no-store`, and `X-Request-Id`. Titles: 404 "Oops, nothing is published here", 410 "Oops, this Draft was taken down", 500 "Oops, something broke on our end", 503 "Oops, Postplan is briefly unavailable" (+ `Retry-After: 30`). "Try again" only on retryable statuses; "Go back" only when `history.length > 1`. `Accept: application/json` gets the same error as problem+json instead
 - Host dispatch: dashboard routes (`/keys`, `/api/v1/...`, `/sw.js`) are not reachable on a draft host
 
 ## How to get to it (user POV)
@@ -44,7 +45,9 @@ For a title edit, `PATCH /api/v1/drafts/$ID` with a new `title` (or edit it on t
 
 For CSP behavior (not just the header), publish HTML with an inline `<script>` that writes to the DOM, an `<img src="https://example.com/x.png">`, and two `@font-face` rules used on the page: one `data:font/woff2;base64,…` (e.g. a font from `node_modules/@ibm/plex-mono/fonts/complete/woff2/`) and one external URL (`https://example.com/font.woff2`). Open `$D/` in the browser, wait for `document.fonts.ready`, and check `document.fonts` plus a screenshot: the script runs, the `data:` font is `loaded`, and both the external font (`error`) and external image are blocked.
 
-After delete (`DELETE /api/v1/drafts/$ID`): `$D/`, `$D/v/1`, `$D/?download=1`, `$D/og.png`, `$D/v/1/og.png` → 404.
+After delete (`DELETE /api/v1/drafts/$ID`): `$D/`, `$D/v/1`, `$D/?download=1`, `$D/og.png`, `$D/v/1/og.png` → 410.
+
+For 5xx: `docker stop postplan-garage`, then `$D/` → 503 page with `Retry-After: 30` (and `POST /api/v1/drafts` → 503 problem+json); `docker start postplan-garage` after. A 500 needs a Version whose object is gone from Garage (delete it with a `DeleteObjectCommand` against `versionObjectKey(id, n)`); the page and the `Accept: application/json` body must not contain the exception message (`NoSuchKey`), and the app log carries it at level 50 under the same request id.
 
 ## Gotchas
 

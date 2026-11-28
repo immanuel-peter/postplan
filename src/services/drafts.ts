@@ -390,6 +390,15 @@ export async function getDraftBySlug(db: Database, slug: string): Promise<DraftR
   return asDraft(row);
 }
 
+/** The status of whatever Draft holds `slug`, deleted ones included; null if none ever did. */
+export async function draftStatusBySlug(db: Database, slug: string): Promise<DraftStatus | null> {
+  const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.slug, slug)).limit(1);
+  if (!row) {
+    return null;
+  }
+  return row.status === "deleted" ? "deleted" : "active";
+}
+
 export async function patchDraft(input: {
   db: Database;
   id: string;

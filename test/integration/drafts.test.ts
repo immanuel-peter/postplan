@@ -233,7 +233,7 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     assert.equal(deleted.statusCode, 204);
 
     const publicAfter = await t.app.inject({ method: "GET", url: "/", headers: draftHost(draft.slug) });
-    assert.equal(publicAfter.statusCode, 404);
+    assert.equal(publicAfter.statusCode, 410, "a deleted Draft's host says it was taken down");
 
     const versionAfter = await addVersion(draft.id, htmlDoc("zombie"), { "if-match": '"1"' });
     assert.equal(versionAfter.statusCode, 404);
@@ -534,6 +534,6 @@ describe("draft lifecycle", { skip: skipWithoutDb }, () => {
     });
     assert.equal(deleted.statusCode, 204);
     const gone = await t.app.inject({ method: "GET", url: "/og.png", headers: draftHost(draft.slug) });
-    assert.equal(gone.statusCode, 404);
+    assert.equal(gone.statusCode, 410);
   });
 });

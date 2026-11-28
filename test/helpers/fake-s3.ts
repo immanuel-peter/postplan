@@ -17,6 +17,8 @@ type StoredObject = { bytes: Buffer; contentType: string | undefined };
 export class FakeS3 {
   readonly objects = new Map<string, StoredObject>();
   readonly buckets = new Set<string>();
+  /** When set, every object read or write throws it: simulates Garage failing or being unreachable. */
+  failWith: Error | null = null;
 
   constructor(bucket: string) {
     this.buckets.add(bucket);
@@ -27,6 +29,9 @@ export class FakeS3 {
   }
 
   async send(command: unknown): Promise<unknown> {
+    if (this.failWith && (command instanceof GetObjectCommand || command instanceof PutObjectCommand)) {
+      throw this.failWith;
+    }
     if (command instanceof HeadBucketCommand) {
       if (!this.buckets.has(command.input.Bucket ?? "")) {
         throw Object.assign(new Error("NoSuchBucket"), { name: "NotFound" });
