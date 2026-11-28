@@ -22,6 +22,7 @@ import {
   type RelyingParty,
 } from "../lib/admin-auth.js";
 import { dashboardHostConstraint, isDashboardHostKind } from "../lib/host.js";
+import { sendError } from "../lib/errors.js";
 import { formatStamp, isoStamp } from "../lib/time.js";
 import { hashToken, hashesEqual } from "../lib/tokens.js";
 import {
@@ -541,7 +542,7 @@ export async function registerAuthRoutes(app: FastifyInstance, deps: AppDeps): P
       }
       const removed = await removeCredential(deps.db, request.params.id);
       if (removed === "not_found") {
-        return reply.code(404).type("text/plain").send("not found");
+        return sendError(request, reply, 404);
       }
       if (removed === "last_credential") {
         noStore(reply);

@@ -9,19 +9,17 @@ import {
   documentEtag,
   draftCsp,
 } from "../lib/csp.js";
+import { sendError } from "../lib/errors.js";
 import { sha256Hex } from "../lib/hash.js";
 import { assetOrigin } from "../lib/host.js";
 import { addLinkPreview, previewFingerprint, previewText } from "../lib/link-preview.js";
 import { OG_CARD_REVISION, renderOgCard } from "../lib/og-card.js";
 import { getHtml } from "../lib/s3.js";
-import { getVersionForPublic } from "../services/drafts.js";
+import { draftStatusBySlug, getVersionForPublic } from "../services/drafts.js";
 import { matchesEtag, parseVersionNumber } from "../lib/request.js";
 
 const HTML_TYPE = "text/html; charset=utf-8";
 const CARD_CACHE_SIZE = 64;
-
-const NOT_FOUND_HTML =
-  "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>Not found</title></head>\n<body><p>Not found</p></body></html>";
 
 type VersionParams = {
   n: string;
@@ -52,8 +50,14 @@ function draftSlug(hostKind: FastifyRequest["hostKind"]): string | null {
   }
 }
 
-function sendNotFound(reply: FastifyReply): FastifyReply {
-  return reply.code(404).type(HTML_TYPE).send(NOT_FOUND_HTML);
+function sendNotFound(request: FastifyRequest, reply: FastifyReply): FastifyReply {
+  return sendError(request, reply, 404);
+}
+
+/** A slug that once served a Draft says so (410), instead of looking like a typo (404). */
+async function sendMissing(request: FastifyRequest, reply: FastifyReply, deps: AppDeps, slug: string): Promise<void> {
+  const status = await draftStatusBySlug(deps.db, slug);
+  sendError(request, reply, status === "deleted" ? 410 : 404);
 }
 
 function applyDocumentHeaders(
@@ -87,7 +91,7 @@ async function servePublicHtml(
       ? await getVersionForPublic(deps.db, slug)
       : await getVersionForPublic(deps.db, slug, versionNumber);
   if (found === null) {
-    sendNotFound(reply);
+    await sendMissing(request, reply, deps, slug);
     return;
   }
 
@@ -139,7 +143,7 @@ async function serveCard(
 ): Promise<void> {
   const found = await getVersionForPublic(deps.db, slug, versionNumber);
   if (found === null) {
-    sendNotFound(reply);
+    await sendMissing(request, reply, deps, slug);
     return;
   }
   const { draft, version } = found;
@@ -234,7 +238,7 @@ export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps):
     }
     const versionNumber = parseVersionNumber(request.params.n);
     if (versionNumber === null) {
-      sendNotFound(reply);
+      sendNotFound(request, reply);
       return;
     }
     await serveCard(request, reply, deps, cards, slug, versionNumber);
@@ -255,13 +259,13 @@ export async function registerPublicRoutes(app: FastifyInstance, deps: AppDeps):
     }
     const versionNumber = parseVersionNumber(request.params.n);
     if (versionNumber === null) {
-      sendNotFound(reply);
+      sendNotFound(request, reply);
       return;
     }
     await servePublicHtml(request, reply, deps, slug, versionNumber, contentSecurityPolicy);
   });
 
-  app.all("/*", draftOnly, async (_request, reply) => {
-    sendNotFound(reply);
+  app.all("/*", draftOnly, async (request, reply) => {
+    sendNotFound(request, reply);
   });
 }

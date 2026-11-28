@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AppDeps } from "../app.js";
 import { ASSET_DOCUMENT_CSP, CURRENT_CACHE_CONTROL, IMMUTABLE_CACHE_CONTROL } from "../lib/csp.js";
+import { sendError } from "../lib/errors.js";
 import { getObjectStream } from "../lib/s3.js";
 import type { AssetRecord } from "../services/assets.js";
 import { getAsset, parseAssetPath } from "../services/assets.js";
@@ -142,7 +143,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
     const match = /^([A-Za-z0-9]+)\.webp$/.exec(request.params.file);
     const record = match ? await getAsset(deps.db, match[1] ?? "") : null;
     if (record === null || isServiceError(record) || record.thumbKey === null) {
-      reply.code(404).type("text/plain").send("not found");
+      sendError(request, reply, 404);
       return;
     }
     const etag = `"thumb-${record.sha256}"`;
@@ -164,17 +165,17 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
 
   app.get<{ Params: AssetParams; Querystring: AssetQuery }>("/:id", assetsOnly, async (request, reply) => {
     if (request.hostKind.kind !== "assets") {
-      reply.code(404).type("text/plain").send("not found");
+      sendError(request, reply, 404);
       return;
     }
     const id = parseAssetPath(request.params.id);
     if (id === "") {
-      reply.code(404).type("text/plain").send("not found");
+      sendError(request, reply, 404);
       return;
     }
     const record = await getAsset(deps.db, id);
     if (isServiceError(record)) {
-      reply.code(404).type("text/plain").send("not found");
+      sendError(request, reply, 404);
       return;
     }
 
@@ -214,7 +215,7 @@ export async function registerAssetPublicRoutes(app: FastifyInstance, deps: AppD
     return reply.code(206).send(result.body);
   });
 
-  app.all("/*", assetsOnly, async (_request, reply) => {
-    reply.code(404).type("text/plain").send("not found");
+  app.all("/*", assetsOnly, async (request, reply) => {
+    sendError(request, reply, 404);
   });
 }

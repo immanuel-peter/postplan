@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
 import { relyingParty, serializeCookie } from "../lib/admin-auth.js";
+import { sendError } from "../lib/errors.js";
 import { dashboardHostConstraint, isDashboardHostKind } from "../lib/host.js";
 import { parseTheme, THEME_COOKIE_MAX_AGE, THEMES, themeCookieName, type Theme } from "../lib/theme.js";
 import { formatStamp, isoStamp, shortCommit } from "../lib/time.js";
@@ -389,11 +390,11 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     }
     const draft = await getDraft(deps.db, request.params.id);
     if (isServiceError(draft)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     const versions = await listVersions(deps.db, draft.id);
     if (isServiceError(versions)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     return reply.view("drafts/detail", {
       title: draftTitle(draft.title),
@@ -426,7 +427,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       ...("description" in body ? { description: readField(body, "description") } : {}),
     });
     if (isServiceError(updated)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     if (request.headers.accept === "application/json") {
       return reply.send({
@@ -448,7 +449,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       favorite: readField(request.body, "favorite") === "1",
     });
     if (isServiceError(updated)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     // Back to the view the star was clicked in; only these two fixed paths, never a caller URL.
     return reply.redirect(readField(request.body, "show") === "favorites" ? "/?show=favorites" : "/");
@@ -460,7 +461,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     }
     const deleted = await deleteDraft(deps.db, request.params.id);
     if (isServiceError(deleted)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     return reply.redirect("/");
   });
@@ -505,7 +506,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     }
     const revoked = await revokeToken(deps.db, request.params.id);
     if (isServiceError(revoked)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     return reply.redirect("/settings/keys");
   });
@@ -674,7 +675,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
     }
     const asset = await getAsset(deps.db, request.params.id);
     if (isServiceError(asset)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     const filename = assetDisplayName(asset.filename);
     const description = asset.description?.trim() || "";
@@ -727,7 +728,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       description: description ?? null,
     });
     if (isServiceError(updated)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     if (request.headers.accept === "application/json") {
       const url = deps.assetUrls.publicUrl(updated.id, updated.filename);
@@ -747,7 +748,7 @@ export async function registerDashboardRoutes(app: FastifyInstance, deps: AppDep
       id: request.params.id,
     });
     if (isServiceError(deleted)) {
-      return reply.code(404).type("text/plain").send("not found");
+      return sendError(request, reply, 404);
     }
     return reply.redirect("/assets?deleted=1");
   });

@@ -7,11 +7,13 @@ import swagger from "@fastify/swagger";
 import view from "@fastify/view";
 import { Eta } from "eta";
 import Fastify from "fastify";
+import { ulid } from "ulid";
 import type { S3Client } from "@aws-sdk/client-s3";
 import type { AppConfig } from "./config.js";
 import type { Database } from "./db/client.js";
 import { relyingParty } from "./lib/admin-auth.js";
 import { registerAdminGuard } from "./lib/admin-guard.js";
+import { registerErrorHandlers } from "./lib/errors.js";
 import { sha256Hex } from "./lib/hash.js";
 import { classifyHost, dashboardHostConstraint } from "./lib/host.js";
 import { MAX_HTML_BYTES } from "./lib/html.js";
@@ -56,6 +58,9 @@ export async function buildApp(deps: AppDeps) {
     logger: true,
     trustProxy: true,
     bodyLimit: MAX_HTML_BYTES + 1024 * 1024,
+    // Never trust a client-sent id: it ends up in logs and error bodies.
+    requestIdHeader: false,
+    genReqId: () => `req_${ulid()}`,
   });
 
   app.decorateRequest("hostKind", null);
@@ -130,7 +135,10 @@ export async function buildApp(deps: AppDeps) {
     defaultContext: { cssVersion },
   });
 
+  registerErrorHandlers(app);
+
   app.addHook("onRequest", async (request, reply) => {
+    reply.header("X-Request-Id", request.id);
     request.hostKind = classifyHost(request.headers.host, deps.config.baseDomain);
     const path = request.url.split("?")[0] ?? "";
     if (path === "/healthz" || path === "/readyz") {

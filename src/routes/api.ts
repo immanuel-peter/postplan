@@ -1,6 +1,7 @@
-import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AppDeps } from "../app.js";
 import { requireToken } from "../lib/auth.js";
+import { sendError } from "../lib/errors.js";
 import { currentEtag } from "../lib/csp.js";
 import { sha256Hex } from "../lib/hash.js";
 import { optionalField, parseExpectedVersion, readAssetUpload, readMultipart } from "../lib/multipart.js";
@@ -44,6 +45,9 @@ const problemSchema = {
     title: { type: "string" },
     status: { type: "integer" },
     detail: { type: "string" },
+    instance: { type: "string", description: "Request path this problem occurred on" },
+    requestId: { type: "string", description: "Same as the X-Request-Id response header" },
+    retryable: { type: "boolean", description: "Whether repeating the same request may succeed" },
     currentVersion: { type: "integer" },
   },
 };
@@ -170,6 +174,8 @@ const errorResponses = {
   403: problemSchema,
   404: problemSchema,
   409: problemSchema,
+  500: problemSchema,
+  503: problemSchema,
 };
 
 type PatchDraftFields = {
@@ -349,18 +355,8 @@ export async function registerApiRoutes(app: FastifyInstance, deps: AppDeps): Pr
   await app.register(async (api) => {
     api.addHook("onRequest", async (request, reply) => {
       if (request.hostKind.kind === "draft" || request.hostKind.kind === "assets") {
-        return reply.code(404).type("text/plain").send("not found");
+        return sendError(request, reply, 404);
       }
-    });
-
-    api.setErrorHandler((error: FastifyError, _request, reply) => {
-      if (error.validation) {
-        return sendProblem(reply, problem(400, "Bad Request", error.message));
-      }
-      if (error.statusCode === 413) {
-        return sendProblem(reply, problem(413, "Payload Too Large", error.message));
-      }
-      return reply.send(error);
     });
 
     api.post(
